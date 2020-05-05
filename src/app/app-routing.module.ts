@@ -11,6 +11,10 @@ const routes: Routes = [
     redirectTo: 'dashboard',
     pathMatch: 'full'
   },
+  {
+    path: 'desktop',
+    loadChildren: () => import('./pages/desktop/desktop.module').then( m => m.DesktopPageModule)
+  },
 ];
 
 @NgModule({
