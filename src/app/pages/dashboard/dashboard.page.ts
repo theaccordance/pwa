@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import {Store} from '@ngrx/store';
 import {RootState} from '../../../ngrx/state';
-import {PopToast} from '../../../ngrx/application/application.actions';
+import {PopToast, ShowLoader} from '../../../ngrx/application/application.actions';
 
 @Component({
   selector: 'app-dashboard',
@@ -16,6 +16,6 @@ export class DashboardPage implements OnInit {
   }
 
   popToast() {
-    return this.store.dispatch(new PopToast({message: 'Triggered from dashboard'}));
+    return this.store.dispatch(new ShowLoader());
   }
 }

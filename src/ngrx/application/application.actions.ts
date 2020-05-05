@@ -1,4 +1,4 @@
-import {Action} from "@ngrx/store";
+import {Action} from '@ngrx/store';
 import {Toast} from './application.model';
 
 export const ApplicationActions = {
@@ -15,6 +15,14 @@ export class PopToast implements Action {
 
 export class ServeToast implements Action {
   readonly type = ApplicationActions.ServeToast;
+}
+
+export class ShowLoader implements Action {
+  readonly type = ApplicationActions.ShowLoader;
+}
+
+export class DismissLoader implements Action {
+  readonly type = ApplicationActions.DismissLoader;
 }
 
 
