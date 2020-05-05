@@ -3,17 +3,20 @@ import { Routes, RouterModule } from '@angular/router';
 
 import { DesktopPage } from './desktop.page';
 
-import { routes as appRoutes } from '../../app-routing.module';
-
-const children = appRoutes
-  .filter((route) => route.path !== 'children')
-  .filter((route) => !route.redirectTo)
-
 const routes: Routes = [
   {
     path: '',
     component: DesktopPage,
-    children
+    children: [
+      {
+        path: 'about',
+        loadChildren: () => import('../../pages/about/about.module').then( m => m.AboutPageModule)
+      },
+      {
+        path: 'dashboard',
+        loadChildren: () => import('../../pages/dashboard/dashboard.module').then( m => m.DashboardPageModule)
+      },
+    ]
   }
 ];
 

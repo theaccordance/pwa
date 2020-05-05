@@ -1,10 +1,12 @@
 <ion-split-pane when="xs" content-id="main">
   <ion-menu content-id="main">
+    <ion-header>
+      <ion-toolbar color="primary">
+        <ion-title>Navigation</ion-title>
+      </ion-toolbar>
+    </ion-header>
     <ion-content>
       <ion-list>
-        <ion-list-header>
-          Navigate
-        </ion-list-header>
         <ion-menu-toggle auto-hide="false">
           <ion-item button routerLink="/dashboard">
             <ion-icon slot="start" name='document-outline'></ion-icon>

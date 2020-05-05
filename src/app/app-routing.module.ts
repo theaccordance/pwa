@@ -1,14 +1,19 @@
 import { NgModule } from '@angular/core';
+import {StoreModule} from "@ngrx/store";
+
 import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
+import {StoreReducers} from '../ngrx/reducers';
+
+export const DEFAULT_CONTENT_PATH = 'dashboard';
 
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'desktop',
+    redirectTo: `desktop/${DEFAULT_CONTENT_PATH}`,
     pathMatch: 'full'
   },
   {
-    path: 'dashboard',
+    path: DEFAULT_CONTENT_PATH,
     loadChildren: () => import('./pages/dashboard/dashboard.module').then( m => m.DashboardPageModule)
   },
   {
@@ -23,7 +28,8 @@ export const routes: Routes = [
 
 @NgModule({
   imports: [
-    RouterModule.forRoot(routes, { preloadingStrategy: PreloadAllModules })
+    RouterModule.forRoot(routes, { preloadingStrategy: PreloadAllModules }),
+    StoreModule.forRoot(StoreReducers)
   ],
   exports: [RouterModule]
 })

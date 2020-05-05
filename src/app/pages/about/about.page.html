@@ -1,0 +1,25 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>about</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-list>
+    <ion-item-divider>Project</ion-item-divider>
+    <ion-item>
+      <ion-label>Version</ion-label>
+      <ion-note slot="end" *ngModel="content.version"></ion-note>
+    </ion-item>
+    <ion-item>
+      <ion-label>SHA</ion-label>
+      <ion-note slot="end" *ngModel="content.version"></ion-note>
+    </ion-item>
+    <ion-item>
+      <ion-label>Github</ion-label>
+      <ion-note slot="end">
+        <ion-icon icon="open-outline" [routerLink]="content.github"></ion-icon>
+      </ion-note>
+    </ion-item>
+  </ion-list>
+</ion-content>

@@ -1038,6 +1038,11 @@
   resolved "https://registry.yarnpkg.com/@istanbuljs/schema/-/schema-0.1.2.tgz#26520bf09abe4a5644cd5414e37125a8954241dd"
   integrity sha512-tsAQNx32a8CoFhjhijUIhI4kccIAgmGhy8LZMZgGfmXcpMbPRUqn5LWmgRttILi6yeGmBJd2xsPkFMs0PzgPCw==
 
+"@ngrx/store@^9.1.1":
+  version "9.1.1"
+  resolved "https://registry.yarnpkg.com/@ngrx/store/-/store-9.1.1.tgz#05eaaaae6c01d7058fae7d87d423ae33e86543b9"
+  integrity sha512-QxoNx+bfHb/3jkIsp/K+EnLodkY9zxHZIgaCXdkLPUzN5BUsCOLT6PLX0p1NUaBfJT/haBv7dAx7jGbSnrnUKA==
+
 "@ngtools/webpack@8.3.26":
   version "8.3.26"
   resolved "https://registry.yarnpkg.com/@ngtools/webpack/-/webpack-8.3.26.tgz#b534838425948fb16679d2320ca588feb08fa64a"
@@ -6729,7 +6734,7 @@ rxjs@6.5.4:
   dependencies:
     tslib "^1.9.0"
 
-rxjs@^6.4.0, rxjs@~6.5.1:
+rxjs@^6.4.0, rxjs@^6.5.5:
   version "6.5.5"
   resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-6.5.5.tgz#c5c884e3094c8cfee31bf27eb87e54ccfc87f9ec"
   integrity sha512-WfQI+1gohdf0Dai/Bbmk5L5ItH5tYqm3ki2c5GdWhKjalzjg93N3avFjVStyZZz+A2Em+ZxKH5bNghw9UeylGQ==
