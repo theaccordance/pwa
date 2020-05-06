@@ -1,4 +1,9 @@
 import { Component, OnInit } from '@angular/core';
+import {Observable} from 'rxjs';
+import {Store} from '@ngrx/store';
+import {RootState} from '../../../ngrx/state';
+import {Manifest} from '../../../ngrx/application/application.model';
+import {AboutViewModel, mapToAboutVM} from '../../../ngrx/application/application.selector';
 
 interface Content {
   version: string;
@@ -12,13 +17,11 @@ interface Content {
   styleUrls: ['./about.page.scss'],
 })
 export class AboutPage implements OnInit {
-  private content: Content;
-  constructor() {
-    this.content = {
-      github: 'https://github.com/theaccordance/pwa',
-      sha: '33ea2fc69506b0fa89567ca9128d4f947ea66eb0',
-      version: '1.0.0'
-    };
+  $manifest: Observable<AboutViewModel>;
+  constructor(
+    private store: Store<RootState>
+  ) {
+    this.$manifest = this.store.select(mapToAboutVM);
   }
 
   ngOnInit() {

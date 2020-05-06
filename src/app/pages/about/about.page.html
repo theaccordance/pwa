@@ -5,21 +5,25 @@
 </ion-header>
 
 <ion-content>
-  <ion-list>
-    <ion-item-divider>Project</ion-item-divider>
+  <ion-list *ngIf="$manifest | async as manifest">
+    <ion-list-header>Package.json</ion-list-header>
+    <ion-item>
+      <ion-label>Name</ion-label>
+      <ion-note slot="end">{{manifest.name}}</ion-note>
+    </ion-item>
     <ion-item>
       <ion-label>Version</ion-label>
-      <ion-note slot="end" *ngModel="content.version"></ion-note>
+      <ion-note slot="end">{{manifest.version}}</ion-note>
     </ion-item>
-    <ion-item>
-      <ion-label>SHA</ion-label>
-      <ion-note slot="end" *ngModel="content.version"></ion-note>
+    <ion-item-divider>Dependencies</ion-item-divider>
+    <ion-item *ngFor="let dep of manifest.dependencies | keyvalue">
+      <ion-label>{{dep.key}}</ion-label>
+      <ion-note slot="end">{{dep.value}}</ion-note>
     </ion-item>
-    <ion-item>
-      <ion-label>Github</ion-label>
-      <ion-note slot="end">
-        <ion-icon icon="open-outline" [routerLink]="content.github"></ion-icon>
-      </ion-note>
+    <ion-item-divider>Dev Dependencies</ion-item-divider>
+    <ion-item *ngFor="let dep of manifest.devDependencies | keyvalue">
+      <ion-label>{{dep.key}}</ion-label>
+      <ion-note slot="end">{{dep.value}}</ion-note>
     </ion-item>
   </ion-list>
 </ion-content>

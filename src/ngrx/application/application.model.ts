@@ -1,3 +1,15 @@
+import {version, dependencies, devDependencies, name} from '../../../package.json';
+
+export interface Manifest {
+  name: string;
+  version: string;
+  dependencies: {
+    [key: string]: string;
+  };
+  devDependencies: {
+    [key: string]: string;
+  };
+}
 
 export interface Toast {
   message: string;
@@ -14,16 +26,12 @@ export const BASE_TOAST: Toast = {
 };
 
 export interface ApplicationState {
-  project: object;
+  manifest: Manifest;
   isLoading: boolean;
   toaster?: Partial<Toast>;
 }
 
 export const DEFAULT_APPLICATION_STATE: ApplicationState = {
-  project: {
-    version: '1.0.0',
-    sha: 'no sha provided',
-    github: 'https://www.github.com/theaccordance/pwa'
-  },
+  manifest: {name, version, dependencies, devDependencies},
   isLoading: false
 };

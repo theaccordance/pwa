@@ -1,8 +1,7 @@
 {
-  "name": "pwa",
-  "version": "0.0.1",
-  "author": "Ionic Framework",
-  "homepage": "https://ionicframework.com/",
+  "name": "@mainwaring.dev/pwa",
+  "version": "1.0.0",
+  "author": "Joe Mainwaring",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
