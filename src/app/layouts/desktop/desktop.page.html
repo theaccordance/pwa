@@ -1,0 +1,36 @@
+<ion-split-pane when="xs" content-id="main">
+  <ion-menu content-id="main">
+    <ion-header>
+      <ion-toolbar color="primary">
+        <ion-title>Navigation</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <ion-list>
+        <ion-menu-toggle auto-hide="false">
+          <ion-item button routerLink="/dashboard">
+            <ion-icon slot="start" name='document-outline'></ion-icon>
+            <ion-label>
+              Page (dashboard)
+            </ion-label>
+          </ion-item>
+          <ion-item button routerLink="/desktop/dashboard">
+            <ion-icon slot="start" name='apps-outline'></ion-icon>
+            <ion-label>
+              Dashboard
+            </ion-label>
+          </ion-item>
+          <ion-item button routerLink="/desktop/about">
+            <ion-icon slot="start" name='information-circle-outline'></ion-icon>
+            <ion-label>
+              About
+            </ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+      </ion-list>
+    </ion-content>
+  </ion-menu>
+
+  <ion-router-outlet id="main" ></ion-router-outlet>
+
+</ion-split-pane>
