@@ -35,6 +35,8 @@ function init(grunt) {
         grunt.util._.extend(config, loadConfig('grunt/configs/**/*.js'));
 
         grunt.initConfig(config);
+
+        grunt.registerTask("publish", ["copy:cname", "gh-pages"]);
     }
     loadGrunt();
 

@@ -7,9 +7,11 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:prod": "ng build --configuration production --base-href https://pwa.mainwaring.dev/",
     "test": "ng test",
     "lint": "ng lint",
-    "e2e": "ng e2e"
+    "e2e": "ng e2e",
+    "publish": "npm run build:prod && npx grunt publish"
   },
   "private": true,
   "dependencies": {
@@ -21,6 +23,7 @@
     "@angular/router": "~13.2.2",
     "@ionic/angular": "^6.0.0",
     "@ngrx/store": "^13.2.0",
+    "@ngrx/store-devtools": "^13.2.0",
     "rxjs": "~6.6.0",
     "tslib": "^2.2.0",
     "zone.js": "~0.11.4"
@@ -47,6 +50,7 @@
     "eslint-plugin-prefer-arrow": "1.2.2",
     "grunt": "^1.5.3",
     "grunt-cli": "^1.4.3",
+    "grunt-contrib-copy": "^1.0.0",
     "grunt-gh-pages": "^4.0.0",
     "jasmine-core": "~3.8.0",
     "jasmine-spec-reporter": "~5.0.0",
