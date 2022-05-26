@@ -8,8 +8,12 @@ const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: 'home',
+    redirectTo: 'vinyl',
     pathMatch: 'full'
+  },
+  {
+    path: 'vinyl',
+    loadChildren: () => import('./vinyl/vinyl.module').then( m => m.VinylPageModule)
   },
 ];
 

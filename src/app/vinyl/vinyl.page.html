@@ -1,0 +1,20 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Vinyl Collection</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content *ngIf="viewModel$ | async as vm">
+  <ion-list>
+    <ion-item *ngFor="let record of vm.records">
+      <ion-thumbnail slot="start">
+        <img [src]="record.thumbnail" />
+      </ion-thumbnail>
+      <ion-label slot="start">
+        <h3>{{record.title}}</h3>
+        <p>{{record.artist}}</p>
+        <p>{{record.year}}</p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+</ion-content>
