@@ -20,7 +20,6 @@ export class VinylPage implements OnInit {
 
   ngOnInit() {
     this.backend.getVinyls().subscribe((res: any) => {
-      // console.log(res.data);
       const records = res.data.map((record) => {
         const vinylRecord: VinylRecord = {
           artist: record.attributes.artist,
@@ -32,7 +31,6 @@ export class VinylPage implements OnInit {
         };
         return vinylRecord;
       });
-      console.log(records);
       return this.store.dispatch(new GetVinylRecordsResponse(records));
     });
   }
