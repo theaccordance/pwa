@@ -1,0 +1,26 @@
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**/*"
+
+name: Build and Deploy
+
+jobs:
+  coverage:
+    name: Build Coverage Report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Use Node.js 16.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16.x
+      - name: npm install
+        run: npm install
+      - name: Ionic build
+        run: npm run build
+      - name: Publish to gh-pages branch
+        run: npx grunt gh-pages
