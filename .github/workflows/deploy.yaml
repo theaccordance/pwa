@@ -9,8 +9,8 @@ on:
 name: Build and Deploy
 
 jobs:
-  coverage:
-    name: Build Coverage Report
+  deploy:
+    name: Build PWA and Deploy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -18,6 +18,10 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 16.x
+      - name: configure git
+        run: |
+          git config --global user.email "jm@theaccordance.com"
+          git config --global user.name "Joe Mainwaring"
       - name: npm install
         run: npm install
       - name: Ionic build
