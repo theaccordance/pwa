@@ -106,3 +106,4 @@ dist
 # Manual additions
 .angular
 .idea
+www/
