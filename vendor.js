@@ -16812,6 +16812,96 @@ class InnerSubscriber extends _Subscriber__WEBPACK_IMPORTED_MODULE_0__.Subscribe
 
 /***/ }),
 
+/***/ 7928:
+/*!*************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/Notification.js ***!
+  \*************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "NotificationKind": () => (/* binding */ NotificationKind),
+/* harmony export */   "Notification": () => (/* binding */ Notification)
+/* harmony export */ });
+/* harmony import */ var _observable_empty__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./observable/empty */ 6439);
+/* harmony import */ var _observable_of__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./observable/of */ 4139);
+/* harmony import */ var _observable_throwError__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./observable/throwError */ 6587);
+
+
+
+var NotificationKind;
+(function (NotificationKind) {
+    NotificationKind["NEXT"] = "N";
+    NotificationKind["ERROR"] = "E";
+    NotificationKind["COMPLETE"] = "C";
+})(NotificationKind || (NotificationKind = {}));
+class Notification {
+    constructor(kind, value, error) {
+        this.kind = kind;
+        this.value = value;
+        this.error = error;
+        this.hasValue = kind === 'N';
+    }
+    observe(observer) {
+        switch (this.kind) {
+            case 'N':
+                return observer.next && observer.next(this.value);
+            case 'E':
+                return observer.error && observer.error(this.error);
+            case 'C':
+                return observer.complete && observer.complete();
+        }
+    }
+    do(next, error, complete) {
+        const kind = this.kind;
+        switch (kind) {
+            case 'N':
+                return next && next(this.value);
+            case 'E':
+                return error && error(this.error);
+            case 'C':
+                return complete && complete();
+        }
+    }
+    accept(nextOrObserver, error, complete) {
+        if (nextOrObserver && typeof nextOrObserver.next === 'function') {
+            return this.observe(nextOrObserver);
+        }
+        else {
+            return this.do(nextOrObserver, error, complete);
+        }
+    }
+    toObservable() {
+        const kind = this.kind;
+        switch (kind) {
+            case 'N':
+                return (0,_observable_of__WEBPACK_IMPORTED_MODULE_0__.of)(this.value);
+            case 'E':
+                return (0,_observable_throwError__WEBPACK_IMPORTED_MODULE_1__.throwError)(this.error);
+            case 'C':
+                return (0,_observable_empty__WEBPACK_IMPORTED_MODULE_2__.empty)();
+        }
+        throw new Error('unexpected notification kind value');
+    }
+    static createNext(value) {
+        if (typeof value !== 'undefined') {
+            return new Notification('N', value);
+        }
+        return Notification.undefinedValueNotification;
+    }
+    static createError(err) {
+        return new Notification('E', undefined, err);
+    }
+    static createComplete() {
+        return Notification.completeNotification;
+    }
+}
+Notification.completeNotification = new Notification('C');
+Notification.undefinedValueNotification = new Notification('N', undefined);
+
+
+/***/ }),
+
 /***/ 2378:
 /*!***********************************************************!*\
   !*** ./node_modules/rxjs/_esm2015/internal/Observable.js ***!
@@ -16991,6 +17081,157 @@ class OuterSubscriber extends _Subscriber__WEBPACK_IMPORTED_MODULE_0__.Subscribe
         this.destination.complete();
     }
 }
+
+
+/***/ }),
+
+/***/ 1555:
+/*!**************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/ReplaySubject.js ***!
+  \**************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ReplaySubject": () => (/* binding */ ReplaySubject)
+/* harmony export */ });
+/* harmony import */ var _Subject__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Subject */ 2218);
+/* harmony import */ var _scheduler_queue__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./scheduler/queue */ 8198);
+/* harmony import */ var _Subscription__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./Subscription */ 2425);
+/* harmony import */ var _operators_observeOn__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./operators/observeOn */ 3888);
+/* harmony import */ var _util_ObjectUnsubscribedError__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./util/ObjectUnsubscribedError */ 9086);
+/* harmony import */ var _SubjectSubscription__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./SubjectSubscription */ 1722);
+
+
+
+
+
+
+class ReplaySubject extends _Subject__WEBPACK_IMPORTED_MODULE_0__.Subject {
+    constructor(bufferSize = Number.POSITIVE_INFINITY, windowTime = Number.POSITIVE_INFINITY, scheduler) {
+        super();
+        this.scheduler = scheduler;
+        this._events = [];
+        this._infiniteTimeWindow = false;
+        this._bufferSize = bufferSize < 1 ? 1 : bufferSize;
+        this._windowTime = windowTime < 1 ? 1 : windowTime;
+        if (windowTime === Number.POSITIVE_INFINITY) {
+            this._infiniteTimeWindow = true;
+            this.next = this.nextInfiniteTimeWindow;
+        }
+        else {
+            this.next = this.nextTimeWindow;
+        }
+    }
+    nextInfiniteTimeWindow(value) {
+        if (!this.isStopped) {
+            const _events = this._events;
+            _events.push(value);
+            if (_events.length > this._bufferSize) {
+                _events.shift();
+            }
+        }
+        super.next(value);
+    }
+    nextTimeWindow(value) {
+        if (!this.isStopped) {
+            this._events.push(new ReplayEvent(this._getNow(), value));
+            this._trimBufferThenGetEvents();
+        }
+        super.next(value);
+    }
+    _subscribe(subscriber) {
+        const _infiniteTimeWindow = this._infiniteTimeWindow;
+        const _events = _infiniteTimeWindow ? this._events : this._trimBufferThenGetEvents();
+        const scheduler = this.scheduler;
+        const len = _events.length;
+        let subscription;
+        if (this.closed) {
+            throw new _util_ObjectUnsubscribedError__WEBPACK_IMPORTED_MODULE_1__.ObjectUnsubscribedError();
+        }
+        else if (this.isStopped || this.hasError) {
+            subscription = _Subscription__WEBPACK_IMPORTED_MODULE_2__.Subscription.EMPTY;
+        }
+        else {
+            this.observers.push(subscriber);
+            subscription = new _SubjectSubscription__WEBPACK_IMPORTED_MODULE_3__.SubjectSubscription(this, subscriber);
+        }
+        if (scheduler) {
+            subscriber.add(subscriber = new _operators_observeOn__WEBPACK_IMPORTED_MODULE_4__.ObserveOnSubscriber(subscriber, scheduler));
+        }
+        if (_infiniteTimeWindow) {
+            for (let i = 0; i < len && !subscriber.closed; i++) {
+                subscriber.next(_events[i]);
+            }
+        }
+        else {
+            for (let i = 0; i < len && !subscriber.closed; i++) {
+                subscriber.next(_events[i].value);
+            }
+        }
+        if (this.hasError) {
+            subscriber.error(this.thrownError);
+        }
+        else if (this.isStopped) {
+            subscriber.complete();
+        }
+        return subscription;
+    }
+    _getNow() {
+        return (this.scheduler || _scheduler_queue__WEBPACK_IMPORTED_MODULE_5__.queue).now();
+    }
+    _trimBufferThenGetEvents() {
+        const now = this._getNow();
+        const _bufferSize = this._bufferSize;
+        const _windowTime = this._windowTime;
+        const _events = this._events;
+        const eventsCount = _events.length;
+        let spliceCount = 0;
+        while (spliceCount < eventsCount) {
+            if ((now - _events[spliceCount].time) < _windowTime) {
+                break;
+            }
+            spliceCount++;
+        }
+        if (eventsCount > _bufferSize) {
+            spliceCount = Math.max(spliceCount, eventsCount - _bufferSize);
+        }
+        if (spliceCount > 0) {
+            _events.splice(0, spliceCount);
+        }
+        return _events;
+    }
+}
+class ReplayEvent {
+    constructor(time, value) {
+        this.time = time;
+        this.value = value;
+    }
+}
+
+
+/***/ }),
+
+/***/ 1925:
+/*!**********************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/Scheduler.js ***!
+  \**********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Scheduler": () => (/* binding */ Scheduler)
+/* harmony export */ });
+class Scheduler {
+    constructor(SchedulerAction, now = Scheduler.now) {
+        this.SchedulerAction = SchedulerAction;
+        this.now = now;
+    }
+    schedule(work, delay = 0, state) {
+        return new this.SchedulerAction(this, work).schedule(state, delay);
+    }
+}
+Scheduler.now = () => Date.now();
 
 
 /***/ }),
@@ -18470,6 +18711,76 @@ function concatMap(project, resultSelector) {
 
 /***/ }),
 
+/***/ 823:
+/*!***********************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/operators/debounceTime.js ***!
+  \***********************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "debounceTime": () => (/* binding */ debounceTime)
+/* harmony export */ });
+/* harmony import */ var _Subscriber__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../Subscriber */ 14);
+/* harmony import */ var _scheduler_async__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../scheduler/async */ 328);
+
+
+function debounceTime(dueTime, scheduler = _scheduler_async__WEBPACK_IMPORTED_MODULE_0__.async) {
+    return (source) => source.lift(new DebounceTimeOperator(dueTime, scheduler));
+}
+class DebounceTimeOperator {
+    constructor(dueTime, scheduler) {
+        this.dueTime = dueTime;
+        this.scheduler = scheduler;
+    }
+    call(subscriber, source) {
+        return source.subscribe(new DebounceTimeSubscriber(subscriber, this.dueTime, this.scheduler));
+    }
+}
+class DebounceTimeSubscriber extends _Subscriber__WEBPACK_IMPORTED_MODULE_1__.Subscriber {
+    constructor(destination, dueTime, scheduler) {
+        super(destination);
+        this.dueTime = dueTime;
+        this.scheduler = scheduler;
+        this.debouncedSubscription = null;
+        this.lastValue = null;
+        this.hasValue = false;
+    }
+    _next(value) {
+        this.clearDebounce();
+        this.lastValue = value;
+        this.hasValue = true;
+        this.add(this.debouncedSubscription = this.scheduler.schedule(dispatchNext, this.dueTime, this));
+    }
+    _complete() {
+        this.debouncedNext();
+        this.destination.complete();
+    }
+    debouncedNext() {
+        this.clearDebounce();
+        if (this.hasValue) {
+            const { lastValue } = this;
+            this.lastValue = null;
+            this.hasValue = false;
+            this.destination.next(lastValue);
+        }
+    }
+    clearDebounce() {
+        const debouncedSubscription = this.debouncedSubscription;
+        if (debouncedSubscription !== null) {
+            this.remove(debouncedSubscription);
+            debouncedSubscription.unsubscribe();
+            this.debouncedSubscription = null;
+        }
+    }
+}
+function dispatchNext(subscriber) {
+    subscriber.debouncedNext();
+}
+
+
+/***/ }),
+
 /***/ 9701:
 /*!*************************************************************************!*\
   !*** ./node_modules/rxjs/_esm2015/internal/operators/defaultIfEmpty.js ***!
@@ -18955,6 +19266,113 @@ class MulticastOperator {
 
 /***/ }),
 
+/***/ 3888:
+/*!********************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/operators/observeOn.js ***!
+  \********************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "observeOn": () => (/* binding */ observeOn),
+/* harmony export */   "ObserveOnOperator": () => (/* binding */ ObserveOnOperator),
+/* harmony export */   "ObserveOnSubscriber": () => (/* binding */ ObserveOnSubscriber),
+/* harmony export */   "ObserveOnMessage": () => (/* binding */ ObserveOnMessage)
+/* harmony export */ });
+/* harmony import */ var _Subscriber__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../Subscriber */ 14);
+/* harmony import */ var _Notification__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../Notification */ 7928);
+
+
+function observeOn(scheduler, delay = 0) {
+    return function observeOnOperatorFunction(source) {
+        return source.lift(new ObserveOnOperator(scheduler, delay));
+    };
+}
+class ObserveOnOperator {
+    constructor(scheduler, delay = 0) {
+        this.scheduler = scheduler;
+        this.delay = delay;
+    }
+    call(subscriber, source) {
+        return source.subscribe(new ObserveOnSubscriber(subscriber, this.scheduler, this.delay));
+    }
+}
+class ObserveOnSubscriber extends _Subscriber__WEBPACK_IMPORTED_MODULE_0__.Subscriber {
+    constructor(destination, scheduler, delay = 0) {
+        super(destination);
+        this.scheduler = scheduler;
+        this.delay = delay;
+    }
+    static dispatch(arg) {
+        const { notification, destination } = arg;
+        notification.observe(destination);
+        this.unsubscribe();
+    }
+    scheduleMessage(notification) {
+        const destination = this.destination;
+        destination.add(this.scheduler.schedule(ObserveOnSubscriber.dispatch, this.delay, new ObserveOnMessage(notification, this.destination)));
+    }
+    _next(value) {
+        this.scheduleMessage(_Notification__WEBPACK_IMPORTED_MODULE_1__.Notification.createNext(value));
+    }
+    _error(err) {
+        this.scheduleMessage(_Notification__WEBPACK_IMPORTED_MODULE_1__.Notification.createError(err));
+        this.unsubscribe();
+    }
+    _complete() {
+        this.scheduleMessage(_Notification__WEBPACK_IMPORTED_MODULE_1__.Notification.createComplete());
+        this.unsubscribe();
+    }
+}
+class ObserveOnMessage {
+    constructor(notification, destination) {
+        this.notification = notification;
+        this.destination = destination;
+    }
+}
+
+
+/***/ }),
+
+/***/ 2428:
+/*!****************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/operators/pluck.js ***!
+  \****************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "pluck": () => (/* binding */ pluck)
+/* harmony export */ });
+/* harmony import */ var _map__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./map */ 6942);
+
+function pluck(...properties) {
+    const length = properties.length;
+    if (length === 0) {
+        throw new Error('list of properties cannot be empty.');
+    }
+    return (source) => (0,_map__WEBPACK_IMPORTED_MODULE_0__.map)(plucker(properties, length))(source);
+}
+function plucker(props, length) {
+    const mapper = (x) => {
+        let currentProp = x;
+        for (let i = 0; i < length; i++) {
+            const p = currentProp != null ? currentProp[props[i]] : undefined;
+            if (p !== void 0) {
+                currentProp = p;
+            }
+            else {
+                return undefined;
+            }
+        }
+        return currentProp;
+    };
+    return mapper;
+}
+
+
+/***/ }),
+
 /***/ 8331:
 /*!*******************************************************************!*\
   !*** ./node_modules/rxjs/_esm2015/internal/operators/refCount.js ***!
@@ -19114,6 +19532,45 @@ function shareSubjectFactory() {
 }
 function share() {
     return (source) => (0,_refCount__WEBPACK_IMPORTED_MODULE_1__.refCount)()((0,_multicast__WEBPACK_IMPORTED_MODULE_2__.multicast)(shareSubjectFactory)(source));
+}
+
+
+/***/ }),
+
+/***/ 6276:
+/*!***************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/operators/skip.js ***!
+  \***************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "skip": () => (/* binding */ skip)
+/* harmony export */ });
+/* harmony import */ var _Subscriber__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../Subscriber */ 14);
+
+function skip(count) {
+    return (source) => source.lift(new SkipOperator(count));
+}
+class SkipOperator {
+    constructor(total) {
+        this.total = total;
+    }
+    call(subscriber, source) {
+        return source.subscribe(new SkipSubscriber(subscriber, this.total));
+    }
+}
+class SkipSubscriber extends _Subscriber__WEBPACK_IMPORTED_MODULE_0__.Subscriber {
+    constructor(destination, total) {
+        super(destination);
+        this.total = total;
+        this.count = 0;
+    }
+    _next(x) {
+        if (++this.count > this.total) {
+            this.destination.next(x);
+        }
+    }
 }
 
 
@@ -19365,6 +19822,51 @@ class TakeLastSubscriber extends _Subscriber__WEBPACK_IMPORTED_MODULE_2__.Subscr
 
 /***/ }),
 
+/***/ 5921:
+/*!********************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/operators/takeUntil.js ***!
+  \********************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "takeUntil": () => (/* binding */ takeUntil)
+/* harmony export */ });
+/* harmony import */ var _innerSubscribe__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../innerSubscribe */ 2831);
+
+function takeUntil(notifier) {
+    return (source) => source.lift(new TakeUntilOperator(notifier));
+}
+class TakeUntilOperator {
+    constructor(notifier) {
+        this.notifier = notifier;
+    }
+    call(subscriber, source) {
+        const takeUntilSubscriber = new TakeUntilSubscriber(subscriber);
+        const notifierSubscription = (0,_innerSubscribe__WEBPACK_IMPORTED_MODULE_0__.innerSubscribe)(this.notifier, new _innerSubscribe__WEBPACK_IMPORTED_MODULE_0__.SimpleInnerSubscriber(takeUntilSubscriber));
+        if (notifierSubscription && !takeUntilSubscriber.seenValue) {
+            takeUntilSubscriber.add(notifierSubscription);
+            return source.subscribe(takeUntilSubscriber);
+        }
+        return takeUntilSubscriber;
+    }
+}
+class TakeUntilSubscriber extends _innerSubscribe__WEBPACK_IMPORTED_MODULE_0__.SimpleOuterSubscriber {
+    constructor(destination) {
+        super(destination);
+        this.seenValue = false;
+    }
+    notifyNext() {
+        this.seenValue = true;
+        this.complete();
+    }
+    notifyComplete() {
+    }
+}
+
+
+/***/ }),
+
 /***/ 8759:
 /*!**************************************************************!*\
   !*** ./node_modules/rxjs/_esm2015/internal/operators/tap.js ***!
@@ -19505,6 +20007,192 @@ class ThrowIfEmptySubscriber extends _Subscriber__WEBPACK_IMPORTED_MODULE_0__.Su
 }
 function defaultErrorFactory() {
     return new _util_EmptyError__WEBPACK_IMPORTED_MODULE_1__.EmptyError();
+}
+
+
+/***/ }),
+
+/***/ 9019:
+/*!******************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/operators/timeout.js ***!
+  \******************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "timeout": () => (/* binding */ timeout)
+/* harmony export */ });
+/* harmony import */ var _scheduler_async__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../scheduler/async */ 328);
+/* harmony import */ var _util_TimeoutError__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../util/TimeoutError */ 9906);
+/* harmony import */ var _timeoutWith__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./timeoutWith */ 7019);
+/* harmony import */ var _observable_throwError__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../observable/throwError */ 6587);
+
+
+
+
+function timeout(due, scheduler = _scheduler_async__WEBPACK_IMPORTED_MODULE_0__.async) {
+    return (0,_timeoutWith__WEBPACK_IMPORTED_MODULE_1__.timeoutWith)(due, (0,_observable_throwError__WEBPACK_IMPORTED_MODULE_2__.throwError)(new _util_TimeoutError__WEBPACK_IMPORTED_MODULE_3__.TimeoutError()), scheduler);
+}
+
+
+/***/ }),
+
+/***/ 7019:
+/*!**********************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/operators/timeoutWith.js ***!
+  \**********************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "timeoutWith": () => (/* binding */ timeoutWith)
+/* harmony export */ });
+/* harmony import */ var _scheduler_async__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../scheduler/async */ 328);
+/* harmony import */ var _util_isDate__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../util/isDate */ 1293);
+/* harmony import */ var _innerSubscribe__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../innerSubscribe */ 2831);
+
+
+
+function timeoutWith(due, withObservable, scheduler = _scheduler_async__WEBPACK_IMPORTED_MODULE_0__.async) {
+    return (source) => {
+        let absoluteTimeout = (0,_util_isDate__WEBPACK_IMPORTED_MODULE_1__.isDate)(due);
+        let waitFor = absoluteTimeout ? (+due - scheduler.now()) : Math.abs(due);
+        return source.lift(new TimeoutWithOperator(waitFor, absoluteTimeout, withObservable, scheduler));
+    };
+}
+class TimeoutWithOperator {
+    constructor(waitFor, absoluteTimeout, withObservable, scheduler) {
+        this.waitFor = waitFor;
+        this.absoluteTimeout = absoluteTimeout;
+        this.withObservable = withObservable;
+        this.scheduler = scheduler;
+    }
+    call(subscriber, source) {
+        return source.subscribe(new TimeoutWithSubscriber(subscriber, this.absoluteTimeout, this.waitFor, this.withObservable, this.scheduler));
+    }
+}
+class TimeoutWithSubscriber extends _innerSubscribe__WEBPACK_IMPORTED_MODULE_2__.SimpleOuterSubscriber {
+    constructor(destination, absoluteTimeout, waitFor, withObservable, scheduler) {
+        super(destination);
+        this.absoluteTimeout = absoluteTimeout;
+        this.waitFor = waitFor;
+        this.withObservable = withObservable;
+        this.scheduler = scheduler;
+        this.scheduleTimeout();
+    }
+    static dispatchTimeout(subscriber) {
+        const { withObservable } = subscriber;
+        subscriber._unsubscribeAndRecycle();
+        subscriber.add((0,_innerSubscribe__WEBPACK_IMPORTED_MODULE_2__.innerSubscribe)(withObservable, new _innerSubscribe__WEBPACK_IMPORTED_MODULE_2__.SimpleInnerSubscriber(subscriber)));
+    }
+    scheduleTimeout() {
+        const { action } = this;
+        if (action) {
+            this.action = action.schedule(this, this.waitFor);
+        }
+        else {
+            this.add(this.action = this.scheduler.schedule(TimeoutWithSubscriber.dispatchTimeout, this.waitFor, this));
+        }
+    }
+    _next(value) {
+        if (!this.absoluteTimeout) {
+            this.scheduleTimeout();
+        }
+        super._next(value);
+    }
+    _unsubscribe() {
+        this.action = undefined;
+        this.scheduler = null;
+        this.withObservable = null;
+    }
+}
+
+
+/***/ }),
+
+/***/ 1745:
+/*!*************************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/operators/withLatestFrom.js ***!
+  \*************************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "withLatestFrom": () => (/* binding */ withLatestFrom)
+/* harmony export */ });
+/* harmony import */ var _OuterSubscriber__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../OuterSubscriber */ 5266);
+/* harmony import */ var _util_subscribeToResult__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../util/subscribeToResult */ 640);
+
+
+function withLatestFrom(...args) {
+    return (source) => {
+        let project;
+        if (typeof args[args.length - 1] === 'function') {
+            project = args.pop();
+        }
+        const observables = args;
+        return source.lift(new WithLatestFromOperator(observables, project));
+    };
+}
+class WithLatestFromOperator {
+    constructor(observables, project) {
+        this.observables = observables;
+        this.project = project;
+    }
+    call(subscriber, source) {
+        return source.subscribe(new WithLatestFromSubscriber(subscriber, this.observables, this.project));
+    }
+}
+class WithLatestFromSubscriber extends _OuterSubscriber__WEBPACK_IMPORTED_MODULE_0__.OuterSubscriber {
+    constructor(destination, observables, project) {
+        super(destination);
+        this.observables = observables;
+        this.project = project;
+        this.toRespond = [];
+        const len = observables.length;
+        this.values = new Array(len);
+        for (let i = 0; i < len; i++) {
+            this.toRespond.push(i);
+        }
+        for (let i = 0; i < len; i++) {
+            let observable = observables[i];
+            this.add((0,_util_subscribeToResult__WEBPACK_IMPORTED_MODULE_1__.subscribeToResult)(this, observable, undefined, i));
+        }
+    }
+    notifyNext(_outerValue, innerValue, outerIndex) {
+        this.values[outerIndex] = innerValue;
+        const toRespond = this.toRespond;
+        if (toRespond.length > 0) {
+            const found = toRespond.indexOf(outerIndex);
+            if (found !== -1) {
+                toRespond.splice(found, 1);
+            }
+        }
+    }
+    notifyComplete() {
+    }
+    _next(value) {
+        if (this.toRespond.length === 0) {
+            const args = [value, ...this.values];
+            if (this.project) {
+                this._tryProject(args);
+            }
+            else {
+                this.destination.next(args);
+            }
+        }
+    }
+    _tryProject(args) {
+        let result;
+        try {
+            result = this.project.apply(this, args);
+        }
+        catch (err) {
+            this.destination.error(err);
+            return;
+        }
+        this.destination.next(result);
+    }
 }
 
 
@@ -19719,6 +20407,287 @@ function scheduled(input, scheduler) {
 
 /***/ }),
 
+/***/ 5353:
+/*!*****************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/scheduler/Action.js ***!
+  \*****************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Action": () => (/* binding */ Action)
+/* harmony export */ });
+/* harmony import */ var _Subscription__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../Subscription */ 2425);
+
+class Action extends _Subscription__WEBPACK_IMPORTED_MODULE_0__.Subscription {
+    constructor(scheduler, work) {
+        super();
+    }
+    schedule(state, delay = 0) {
+        return this;
+    }
+}
+
+
+/***/ }),
+
+/***/ 3670:
+/*!**********************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/scheduler/AsyncAction.js ***!
+  \**********************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "AsyncAction": () => (/* binding */ AsyncAction)
+/* harmony export */ });
+/* harmony import */ var _Action__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Action */ 5353);
+
+class AsyncAction extends _Action__WEBPACK_IMPORTED_MODULE_0__.Action {
+    constructor(scheduler, work) {
+        super(scheduler, work);
+        this.scheduler = scheduler;
+        this.work = work;
+        this.pending = false;
+    }
+    schedule(state, delay = 0) {
+        if (this.closed) {
+            return this;
+        }
+        this.state = state;
+        const id = this.id;
+        const scheduler = this.scheduler;
+        if (id != null) {
+            this.id = this.recycleAsyncId(scheduler, id, delay);
+        }
+        this.pending = true;
+        this.delay = delay;
+        this.id = this.id || this.requestAsyncId(scheduler, this.id, delay);
+        return this;
+    }
+    requestAsyncId(scheduler, id, delay = 0) {
+        return setInterval(scheduler.flush.bind(scheduler, this), delay);
+    }
+    recycleAsyncId(scheduler, id, delay = 0) {
+        if (delay !== null && this.delay === delay && this.pending === false) {
+            return id;
+        }
+        clearInterval(id);
+        return undefined;
+    }
+    execute(state, delay) {
+        if (this.closed) {
+            return new Error('executing a cancelled action');
+        }
+        this.pending = false;
+        const error = this._execute(state, delay);
+        if (error) {
+            return error;
+        }
+        else if (this.pending === false && this.id != null) {
+            this.id = this.recycleAsyncId(this.scheduler, this.id, null);
+        }
+    }
+    _execute(state, delay) {
+        let errored = false;
+        let errorValue = undefined;
+        try {
+            this.work(state);
+        }
+        catch (e) {
+            errored = true;
+            errorValue = !!e && e || new Error(e);
+        }
+        if (errored) {
+            this.unsubscribe();
+            return errorValue;
+        }
+    }
+    _unsubscribe() {
+        const id = this.id;
+        const scheduler = this.scheduler;
+        const actions = scheduler.actions;
+        const index = actions.indexOf(this);
+        this.work = null;
+        this.state = null;
+        this.pending = false;
+        this.scheduler = null;
+        if (index !== -1) {
+            actions.splice(index, 1);
+        }
+        if (id != null) {
+            this.id = this.recycleAsyncId(scheduler, id, null);
+        }
+        this.delay = null;
+    }
+}
+
+
+/***/ }),
+
+/***/ 2901:
+/*!*************************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/scheduler/AsyncScheduler.js ***!
+  \*************************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "AsyncScheduler": () => (/* binding */ AsyncScheduler)
+/* harmony export */ });
+/* harmony import */ var _Scheduler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../Scheduler */ 1925);
+
+class AsyncScheduler extends _Scheduler__WEBPACK_IMPORTED_MODULE_0__.Scheduler {
+    constructor(SchedulerAction, now = _Scheduler__WEBPACK_IMPORTED_MODULE_0__.Scheduler.now) {
+        super(SchedulerAction, () => {
+            if (AsyncScheduler.delegate && AsyncScheduler.delegate !== this) {
+                return AsyncScheduler.delegate.now();
+            }
+            else {
+                return now();
+            }
+        });
+        this.actions = [];
+        this.active = false;
+        this.scheduled = undefined;
+    }
+    schedule(work, delay = 0, state) {
+        if (AsyncScheduler.delegate && AsyncScheduler.delegate !== this) {
+            return AsyncScheduler.delegate.schedule(work, delay, state);
+        }
+        else {
+            return super.schedule(work, delay, state);
+        }
+    }
+    flush(action) {
+        const { actions } = this;
+        if (this.active) {
+            actions.push(action);
+            return;
+        }
+        let error;
+        this.active = true;
+        do {
+            if (error = action.execute(action.state, action.delay)) {
+                break;
+            }
+        } while (action = actions.shift());
+        this.active = false;
+        if (error) {
+            while (action = actions.shift()) {
+                action.unsubscribe();
+            }
+            throw error;
+        }
+    }
+}
+
+
+/***/ }),
+
+/***/ 7921:
+/*!**********************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/scheduler/QueueAction.js ***!
+  \**********************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "QueueAction": () => (/* binding */ QueueAction)
+/* harmony export */ });
+/* harmony import */ var _AsyncAction__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./AsyncAction */ 3670);
+
+class QueueAction extends _AsyncAction__WEBPACK_IMPORTED_MODULE_0__.AsyncAction {
+    constructor(scheduler, work) {
+        super(scheduler, work);
+        this.scheduler = scheduler;
+        this.work = work;
+    }
+    schedule(state, delay = 0) {
+        if (delay > 0) {
+            return super.schedule(state, delay);
+        }
+        this.delay = delay;
+        this.state = state;
+        this.scheduler.flush(this);
+        return this;
+    }
+    execute(state, delay) {
+        return (delay > 0 || this.closed) ?
+            super.execute(state, delay) :
+            this._execute(state, delay);
+    }
+    requestAsyncId(scheduler, id, delay = 0) {
+        if ((delay !== null && delay > 0) || (delay === null && this.delay > 0)) {
+            return super.requestAsyncId(scheduler, id, delay);
+        }
+        return scheduler.flush(this);
+    }
+}
+
+
+/***/ }),
+
+/***/ 4021:
+/*!*************************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/scheduler/QueueScheduler.js ***!
+  \*************************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "QueueScheduler": () => (/* binding */ QueueScheduler)
+/* harmony export */ });
+/* harmony import */ var _AsyncScheduler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./AsyncScheduler */ 2901);
+
+class QueueScheduler extends _AsyncScheduler__WEBPACK_IMPORTED_MODULE_0__.AsyncScheduler {
+}
+
+
+/***/ }),
+
+/***/ 328:
+/*!****************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/scheduler/async.js ***!
+  \****************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "asyncScheduler": () => (/* binding */ asyncScheduler),
+/* harmony export */   "async": () => (/* binding */ async)
+/* harmony export */ });
+/* harmony import */ var _AsyncAction__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./AsyncAction */ 3670);
+/* harmony import */ var _AsyncScheduler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./AsyncScheduler */ 2901);
+
+
+const asyncScheduler = new _AsyncScheduler__WEBPACK_IMPORTED_MODULE_0__.AsyncScheduler(_AsyncAction__WEBPACK_IMPORTED_MODULE_1__.AsyncAction);
+const async = asyncScheduler;
+
+
+/***/ }),
+
+/***/ 8198:
+/*!****************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/scheduler/queue.js ***!
+  \****************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "queueScheduler": () => (/* binding */ queueScheduler),
+/* harmony export */   "queue": () => (/* binding */ queue)
+/* harmony export */ });
+/* harmony import */ var _QueueAction__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./QueueAction */ 7921);
+/* harmony import */ var _QueueScheduler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./QueueScheduler */ 4021);
+
+
+const queueScheduler = new _QueueScheduler__WEBPACK_IMPORTED_MODULE_0__.QueueScheduler(_QueueAction__WEBPACK_IMPORTED_MODULE_1__.QueueAction);
+const queue = queueScheduler;
+
+
+/***/ }),
+
 /***/ 2803:
 /*!****************************************************************!*\
   !*** ./node_modules/rxjs/_esm2015/internal/symbol/iterator.js ***!
@@ -19852,6 +20821,31 @@ const ObjectUnsubscribedError = ObjectUnsubscribedErrorImpl;
 
 /***/ }),
 
+/***/ 9906:
+/*!******************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/util/TimeoutError.js ***!
+  \******************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "TimeoutError": () => (/* binding */ TimeoutError)
+/* harmony export */ });
+const TimeoutErrorImpl = (() => {
+    function TimeoutErrorImpl() {
+        Error.call(this);
+        this.message = 'Timeout has occurred';
+        this.name = 'TimeoutError';
+        return this;
+    }
+    TimeoutErrorImpl.prototype = Object.create(Error.prototype);
+    return TimeoutErrorImpl;
+})();
+const TimeoutError = TimeoutErrorImpl;
+
+
+/***/ }),
+
 /***/ 7875:
 /*!*************************************************************************!*\
   !*** ./node_modules/rxjs/_esm2015/internal/util/UnsubscriptionError.js ***!
@@ -19971,6 +20965,23 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "isArrayLike": () => (/* binding */ isArrayLike)
 /* harmony export */ });
 const isArrayLike = ((x) => x && typeof x.length === 'number' && typeof x !== 'function');
+
+
+/***/ }),
+
+/***/ 1293:
+/*!************************************************************!*\
+  !*** ./node_modules/rxjs/_esm2015/internal/util/isDate.js ***!
+  \************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "isDate": () => (/* binding */ isDate)
+/* harmony export */ });
+function isDate(value) {
+    return value instanceof Date && !isNaN(+value);
+}
 
 
 /***/ }),
@@ -27671,6 +28682,2847 @@ class XhrFactory {}
  * Generated bundle index. Do not edit.
  */
 
+
+
+
+/***/ }),
+
+/***/ 8784:
+/*!********************************************************!*\
+  !*** ./node_modules/@angular/common/fesm2015/http.mjs ***!
+  \********************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "HTTP_INTERCEPTORS": () => (/* binding */ HTTP_INTERCEPTORS),
+/* harmony export */   "HttpBackend": () => (/* binding */ HttpBackend),
+/* harmony export */   "HttpClient": () => (/* binding */ HttpClient),
+/* harmony export */   "HttpClientJsonpModule": () => (/* binding */ HttpClientJsonpModule),
+/* harmony export */   "HttpClientModule": () => (/* binding */ HttpClientModule),
+/* harmony export */   "HttpClientXsrfModule": () => (/* binding */ HttpClientXsrfModule),
+/* harmony export */   "HttpContext": () => (/* binding */ HttpContext),
+/* harmony export */   "HttpContextToken": () => (/* binding */ HttpContextToken),
+/* harmony export */   "HttpErrorResponse": () => (/* binding */ HttpErrorResponse),
+/* harmony export */   "HttpEventType": () => (/* binding */ HttpEventType),
+/* harmony export */   "HttpHandler": () => (/* binding */ HttpHandler),
+/* harmony export */   "HttpHeaderResponse": () => (/* binding */ HttpHeaderResponse),
+/* harmony export */   "HttpHeaders": () => (/* binding */ HttpHeaders),
+/* harmony export */   "HttpParams": () => (/* binding */ HttpParams),
+/* harmony export */   "HttpRequest": () => (/* binding */ HttpRequest),
+/* harmony export */   "HttpResponse": () => (/* binding */ HttpResponse),
+/* harmony export */   "HttpResponseBase": () => (/* binding */ HttpResponseBase),
+/* harmony export */   "HttpUrlEncodingCodec": () => (/* binding */ HttpUrlEncodingCodec),
+/* harmony export */   "HttpXhrBackend": () => (/* binding */ HttpXhrBackend),
+/* harmony export */   "HttpXsrfTokenExtractor": () => (/* binding */ HttpXsrfTokenExtractor),
+/* harmony export */   "JsonpClientBackend": () => (/* binding */ JsonpClientBackend),
+/* harmony export */   "JsonpInterceptor": () => (/* binding */ JsonpInterceptor),
+/* harmony export */   "XhrFactory": () => (/* binding */ XhrFactory),
+/* harmony export */   "ɵHttpInterceptingHandler": () => (/* binding */ HttpInterceptingHandler)
+/* harmony export */ });
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @angular/common */ 6362);
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @angular/core */ 3184);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! rxjs */ 4139);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! rxjs */ 2378);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! rxjs/operators */ 1133);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! rxjs/operators */ 9151);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs/operators */ 6942);
+/**
+ * @license Angular v13.2.7
+ * (c) 2010-2022 Google LLC. https://angular.io/
+ * License: MIT
+ */
+
+
+
+
+
+
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * Transforms an `HttpRequest` into a stream of `HttpEvent`s, one of which will likely be a
+ * `HttpResponse`.
+ *
+ * `HttpHandler` is injectable. When injected, the handler instance dispatches requests to the
+ * first interceptor in the chain, which dispatches to the second, etc, eventually reaching the
+ * `HttpBackend`.
+ *
+ * In an `HttpInterceptor`, the `HttpHandler` parameter is the next interceptor in the chain.
+ *
+ * @publicApi
+ */
+
+class HttpHandler {}
+/**
+ * A final `HttpHandler` which will dispatch the request via browser HTTP APIs to a backend.
+ *
+ * Interceptors sit between the `HttpClient` interface and the `HttpBackend`.
+ *
+ * When injected, `HttpBackend` dispatches requests directly to the backend, without going
+ * through the interceptor chain.
+ *
+ * @publicApi
+ */
+
+
+class HttpBackend {}
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * Represents the header configuration options for an HTTP request.
+ * Instances are immutable. Modifying methods return a cloned
+ * instance with the change. The original object is never changed.
+ *
+ * @publicApi
+ */
+
+
+class HttpHeaders {
+  /**  Constructs a new HTTP header object with the given values.*/
+  constructor(headers) {
+    /**
+     * Internal map of lowercased header names to the normalized
+     * form of the name (the form seen first).
+     */
+    this.normalizedNames = new Map();
+    /**
+     * Queued updates to be materialized the next initialization.
+     */
+
+    this.lazyUpdate = null;
+
+    if (!headers) {
+      this.headers = new Map();
+    } else if (typeof headers === 'string') {
+      this.lazyInit = () => {
+        this.headers = new Map();
+        headers.split('\n').forEach(line => {
+          const index = line.indexOf(':');
+
+          if (index > 0) {
+            const name = line.slice(0, index);
+            const key = name.toLowerCase();
+            const value = line.slice(index + 1).trim();
+            this.maybeSetNormalizedName(name, key);
+
+            if (this.headers.has(key)) {
+              this.headers.get(key).push(value);
+            } else {
+              this.headers.set(key, [value]);
+            }
+          }
+        });
+      };
+    } else {
+      this.lazyInit = () => {
+        this.headers = new Map();
+        Object.keys(headers).forEach(name => {
+          let values = headers[name];
+          const key = name.toLowerCase();
+
+          if (typeof values === 'string') {
+            values = [values];
+          }
+
+          if (values.length > 0) {
+            this.headers.set(key, values);
+            this.maybeSetNormalizedName(name, key);
+          }
+        });
+      };
+    }
+  }
+  /**
+   * Checks for existence of a given header.
+   *
+   * @param name The header name to check for existence.
+   *
+   * @returns True if the header exists, false otherwise.
+   */
+
+
+  has(name) {
+    this.init();
+    return this.headers.has(name.toLowerCase());
+  }
+  /**
+   * Retrieves the first value of a given header.
+   *
+   * @param name The header name.
+   *
+   * @returns The value string if the header exists, null otherwise
+   */
+
+
+  get(name) {
+    this.init();
+    const values = this.headers.get(name.toLowerCase());
+    return values && values.length > 0 ? values[0] : null;
+  }
+  /**
+   * Retrieves the names of the headers.
+   *
+   * @returns A list of header names.
+   */
+
+
+  keys() {
+    this.init();
+    return Array.from(this.normalizedNames.values());
+  }
+  /**
+   * Retrieves a list of values for a given header.
+   *
+   * @param name The header name from which to retrieve values.
+   *
+   * @returns A string of values if the header exists, null otherwise.
+   */
+
+
+  getAll(name) {
+    this.init();
+    return this.headers.get(name.toLowerCase()) || null;
+  }
+  /**
+   * Appends a new value to the existing set of values for a header
+   * and returns them in a clone of the original instance.
+   *
+   * @param name The header name for which to append the values.
+   * @param value The value to append.
+   *
+   * @returns A clone of the HTTP headers object with the value appended to the given header.
+   */
+
+
+  append(name, value) {
+    return this.clone({
+      name,
+      value,
+      op: 'a'
+    });
+  }
+  /**
+   * Sets or modifies a value for a given header in a clone of the original instance.
+   * If the header already exists, its value is replaced with the given value
+   * in the returned object.
+   *
+   * @param name The header name.
+   * @param value The value or values to set or overide for the given header.
+   *
+   * @returns A clone of the HTTP headers object with the newly set header value.
+   */
+
+
+  set(name, value) {
+    return this.clone({
+      name,
+      value,
+      op: 's'
+    });
+  }
+  /**
+   * Deletes values for a given header in a clone of the original instance.
+   *
+   * @param name The header name.
+   * @param value The value or values to delete for the given header.
+   *
+   * @returns A clone of the HTTP headers object with the given value deleted.
+   */
+
+
+  delete(name, value) {
+    return this.clone({
+      name,
+      value,
+      op: 'd'
+    });
+  }
+
+  maybeSetNormalizedName(name, lcName) {
+    if (!this.normalizedNames.has(lcName)) {
+      this.normalizedNames.set(lcName, name);
+    }
+  }
+
+  init() {
+    if (!!this.lazyInit) {
+      if (this.lazyInit instanceof HttpHeaders) {
+        this.copyFrom(this.lazyInit);
+      } else {
+        this.lazyInit();
+      }
+
+      this.lazyInit = null;
+
+      if (!!this.lazyUpdate) {
+        this.lazyUpdate.forEach(update => this.applyUpdate(update));
+        this.lazyUpdate = null;
+      }
+    }
+  }
+
+  copyFrom(other) {
+    other.init();
+    Array.from(other.headers.keys()).forEach(key => {
+      this.headers.set(key, other.headers.get(key));
+      this.normalizedNames.set(key, other.normalizedNames.get(key));
+    });
+  }
+
+  clone(update) {
+    const clone = new HttpHeaders();
+    clone.lazyInit = !!this.lazyInit && this.lazyInit instanceof HttpHeaders ? this.lazyInit : this;
+    clone.lazyUpdate = (this.lazyUpdate || []).concat([update]);
+    return clone;
+  }
+
+  applyUpdate(update) {
+    const key = update.name.toLowerCase();
+
+    switch (update.op) {
+      case 'a':
+      case 's':
+        let value = update.value;
+
+        if (typeof value === 'string') {
+          value = [value];
+        }
+
+        if (value.length === 0) {
+          return;
+        }
+
+        this.maybeSetNormalizedName(update.name, key);
+        const base = (update.op === 'a' ? this.headers.get(key) : undefined) || [];
+        base.push(...value);
+        this.headers.set(key, base);
+        break;
+
+      case 'd':
+        const toDelete = update.value;
+
+        if (!toDelete) {
+          this.headers.delete(key);
+          this.normalizedNames.delete(key);
+        } else {
+          let existing = this.headers.get(key);
+
+          if (!existing) {
+            return;
+          }
+
+          existing = existing.filter(value => toDelete.indexOf(value) === -1);
+
+          if (existing.length === 0) {
+            this.headers.delete(key);
+            this.normalizedNames.delete(key);
+          } else {
+            this.headers.set(key, existing);
+          }
+        }
+
+        break;
+    }
+  }
+  /**
+   * @internal
+   */
+
+
+  forEach(fn) {
+    this.init();
+    Array.from(this.normalizedNames.keys()).forEach(key => fn(this.normalizedNames.get(key), this.headers.get(key)));
+  }
+
+}
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * Provides encoding and decoding of URL parameter and query-string values.
+ *
+ * Serializes and parses URL parameter keys and values to encode and decode them.
+ * If you pass URL query parameters without encoding,
+ * the query parameters can be misinterpreted at the receiving end.
+ *
+ *
+ * @publicApi
+ */
+
+
+class HttpUrlEncodingCodec {
+  /**
+   * Encodes a key name for a URL parameter or query-string.
+   * @param key The key name.
+   * @returns The encoded key name.
+   */
+  encodeKey(key) {
+    return standardEncoding(key);
+  }
+  /**
+   * Encodes the value of a URL parameter or query-string.
+   * @param value The value.
+   * @returns The encoded value.
+   */
+
+
+  encodeValue(value) {
+    return standardEncoding(value);
+  }
+  /**
+   * Decodes an encoded URL parameter or query-string key.
+   * @param key The encoded key name.
+   * @returns The decoded key name.
+   */
+
+
+  decodeKey(key) {
+    return decodeURIComponent(key);
+  }
+  /**
+   * Decodes an encoded URL parameter or query-string value.
+   * @param value The encoded value.
+   * @returns The decoded value.
+   */
+
+
+  decodeValue(value) {
+    return decodeURIComponent(value);
+  }
+
+}
+
+function paramParser(rawParams, codec) {
+  const map = new Map();
+
+  if (rawParams.length > 0) {
+    // The `window.location.search` can be used while creating an instance of the `HttpParams` class
+    // (e.g. `new HttpParams({ fromString: window.location.search })`). The `window.location.search`
+    // may start with the `?` char, so we strip it if it's present.
+    const params = rawParams.replace(/^\?/, '').split('&');
+    params.forEach(param => {
+      const eqIdx = param.indexOf('=');
+      const [key, val] = eqIdx == -1 ? [codec.decodeKey(param), ''] : [codec.decodeKey(param.slice(0, eqIdx)), codec.decodeValue(param.slice(eqIdx + 1))];
+      const list = map.get(key) || [];
+      list.push(val);
+      map.set(key, list);
+    });
+  }
+
+  return map;
+}
+/**
+ * Encode input string with standard encodeURIComponent and then un-encode specific characters.
+ */
+
+
+const STANDARD_ENCODING_REGEX = /%(\d[a-f0-9])/gi;
+const STANDARD_ENCODING_REPLACEMENTS = {
+  '40': '@',
+  '3A': ':',
+  '24': '$',
+  '2C': ',',
+  '3B': ';',
+  '2B': '+',
+  '3D': '=',
+  '3F': '?',
+  '2F': '/'
+};
+
+function standardEncoding(v) {
+  return encodeURIComponent(v).replace(STANDARD_ENCODING_REGEX, (s, t) => {
+    var _a;
+
+    return (_a = STANDARD_ENCODING_REPLACEMENTS[t]) !== null && _a !== void 0 ? _a : s;
+  });
+}
+
+function valueToString(value) {
+  return `${value}`;
+}
+/**
+ * An HTTP request/response body that represents serialized parameters,
+ * per the MIME type `application/x-www-form-urlencoded`.
+ *
+ * This class is immutable; all mutation operations return a new instance.
+ *
+ * @publicApi
+ */
+
+
+class HttpParams {
+  constructor(options = {}) {
+    this.updates = null;
+    this.cloneFrom = null;
+    this.encoder = options.encoder || new HttpUrlEncodingCodec();
+
+    if (!!options.fromString) {
+      if (!!options.fromObject) {
+        throw new Error(`Cannot specify both fromString and fromObject.`);
+      }
+
+      this.map = paramParser(options.fromString, this.encoder);
+    } else if (!!options.fromObject) {
+      this.map = new Map();
+      Object.keys(options.fromObject).forEach(key => {
+        const value = options.fromObject[key];
+        this.map.set(key, Array.isArray(value) ? value : [value]);
+      });
+    } else {
+      this.map = null;
+    }
+  }
+  /**
+   * Reports whether the body includes one or more values for a given parameter.
+   * @param param The parameter name.
+   * @returns True if the parameter has one or more values,
+   * false if it has no value or is not present.
+   */
+
+
+  has(param) {
+    this.init();
+    return this.map.has(param);
+  }
+  /**
+   * Retrieves the first value for a parameter.
+   * @param param The parameter name.
+   * @returns The first value of the given parameter,
+   * or `null` if the parameter is not present.
+   */
+
+
+  get(param) {
+    this.init();
+    const res = this.map.get(param);
+    return !!res ? res[0] : null;
+  }
+  /**
+   * Retrieves all values for a  parameter.
+   * @param param The parameter name.
+   * @returns All values in a string array,
+   * or `null` if the parameter not present.
+   */
+
+
+  getAll(param) {
+    this.init();
+    return this.map.get(param) || null;
+  }
+  /**
+   * Retrieves all the parameters for this body.
+   * @returns The parameter names in a string array.
+   */
+
+
+  keys() {
+    this.init();
+    return Array.from(this.map.keys());
+  }
+  /**
+   * Appends a new value to existing values for a parameter.
+   * @param param The parameter name.
+   * @param value The new value to add.
+   * @return A new body with the appended value.
+   */
+
+
+  append(param, value) {
+    return this.clone({
+      param,
+      value,
+      op: 'a'
+    });
+  }
+  /**
+   * Constructs a new body with appended values for the given parameter name.
+   * @param params parameters and values
+   * @return A new body with the new value.
+   */
+
+
+  appendAll(params) {
+    const updates = [];
+    Object.keys(params).forEach(param => {
+      const value = params[param];
+
+      if (Array.isArray(value)) {
+        value.forEach(_value => {
+          updates.push({
+            param,
+            value: _value,
+            op: 'a'
+          });
+        });
+      } else {
+        updates.push({
+          param,
+          value: value,
+          op: 'a'
+        });
+      }
+    });
+    return this.clone(updates);
+  }
+  /**
+   * Replaces the value for a parameter.
+   * @param param The parameter name.
+   * @param value The new value.
+   * @return A new body with the new value.
+   */
+
+
+  set(param, value) {
+    return this.clone({
+      param,
+      value,
+      op: 's'
+    });
+  }
+  /**
+   * Removes a given value or all values from a parameter.
+   * @param param The parameter name.
+   * @param value The value to remove, if provided.
+   * @return A new body with the given value removed, or with all values
+   * removed if no value is specified.
+   */
+
+
+  delete(param, value) {
+    return this.clone({
+      param,
+      value,
+      op: 'd'
+    });
+  }
+  /**
+   * Serializes the body to an encoded string, where key-value pairs (separated by `=`) are
+   * separated by `&`s.
+   */
+
+
+  toString() {
+    this.init();
+    return this.keys().map(key => {
+      const eKey = this.encoder.encodeKey(key); // `a: ['1']` produces `'a=1'`
+      // `b: []` produces `''`
+      // `c: ['1', '2']` produces `'c=1&c=2'`
+
+      return this.map.get(key).map(value => eKey + '=' + this.encoder.encodeValue(value)).join('&');
+    }) // filter out empty values because `b: []` produces `''`
+    // which results in `a=1&&c=1&c=2` instead of `a=1&c=1&c=2` if we don't
+    .filter(param => param !== '').join('&');
+  }
+
+  clone(update) {
+    const clone = new HttpParams({
+      encoder: this.encoder
+    });
+    clone.cloneFrom = this.cloneFrom || this;
+    clone.updates = (this.updates || []).concat(update);
+    return clone;
+  }
+
+  init() {
+    if (this.map === null) {
+      this.map = new Map();
+    }
+
+    if (this.cloneFrom !== null) {
+      this.cloneFrom.init();
+      this.cloneFrom.keys().forEach(key => this.map.set(key, this.cloneFrom.map.get(key)));
+      this.updates.forEach(update => {
+        switch (update.op) {
+          case 'a':
+          case 's':
+            const base = (update.op === 'a' ? this.map.get(update.param) : undefined) || [];
+            base.push(valueToString(update.value));
+            this.map.set(update.param, base);
+            break;
+
+          case 'd':
+            if (update.value !== undefined) {
+              let base = this.map.get(update.param) || [];
+              const idx = base.indexOf(valueToString(update.value));
+
+              if (idx !== -1) {
+                base.splice(idx, 1);
+              }
+
+              if (base.length > 0) {
+                this.map.set(update.param, base);
+              } else {
+                this.map.delete(update.param);
+              }
+            } else {
+              this.map.delete(update.param);
+              break;
+            }
+
+        }
+      });
+      this.cloneFrom = this.updates = null;
+    }
+  }
+
+}
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * A token used to manipulate and access values stored in `HttpContext`.
+ *
+ * @publicApi
+ */
+
+
+class HttpContextToken {
+  constructor(defaultValue) {
+    this.defaultValue = defaultValue;
+  }
+
+}
+/**
+ * Http context stores arbitrary user defined values and ensures type safety without
+ * actually knowing the types. It is backed by a `Map` and guarantees that keys do not clash.
+ *
+ * This context is mutable and is shared between cloned requests unless explicitly specified.
+ *
+ * @usageNotes
+ *
+ * ### Usage Example
+ *
+ * ```typescript
+ * // inside cache.interceptors.ts
+ * export const IS_CACHE_ENABLED = new HttpContextToken<boolean>(() => false);
+ *
+ * export class CacheInterceptor implements HttpInterceptor {
+ *
+ *   intercept(req: HttpRequest<any>, delegate: HttpHandler): Observable<HttpEvent<any>> {
+ *     if (req.context.get(IS_CACHE_ENABLED) === true) {
+ *       return ...;
+ *     }
+ *     return delegate.handle(req);
+ *   }
+ * }
+ *
+ * // inside a service
+ *
+ * this.httpClient.get('/api/weather', {
+ *   context: new HttpContext().set(IS_CACHE_ENABLED, true)
+ * }).subscribe(...);
+ * ```
+ *
+ * @publicApi
+ */
+
+
+class HttpContext {
+  constructor() {
+    this.map = new Map();
+  }
+  /**
+   * Store a value in the context. If a value is already present it will be overwritten.
+   *
+   * @param token The reference to an instance of `HttpContextToken`.
+   * @param value The value to store.
+   *
+   * @returns A reference to itself for easy chaining.
+   */
+
+
+  set(token, value) {
+    this.map.set(token, value);
+    return this;
+  }
+  /**
+   * Retrieve the value associated with the given token.
+   *
+   * @param token The reference to an instance of `HttpContextToken`.
+   *
+   * @returns The stored value or default if one is defined.
+   */
+
+
+  get(token) {
+    if (!this.map.has(token)) {
+      this.map.set(token, token.defaultValue());
+    }
+
+    return this.map.get(token);
+  }
+  /**
+   * Delete the value associated with the given token.
+   *
+   * @param token The reference to an instance of `HttpContextToken`.
+   *
+   * @returns A reference to itself for easy chaining.
+   */
+
+
+  delete(token) {
+    this.map.delete(token);
+    return this;
+  }
+  /**
+   * Checks for existence of a given token.
+   *
+   * @param token The reference to an instance of `HttpContextToken`.
+   *
+   * @returns True if the token exists, false otherwise.
+   */
+
+
+  has(token) {
+    return this.map.has(token);
+  }
+  /**
+   * @returns a list of tokens currently stored in the context.
+   */
+
+
+  keys() {
+    return this.map.keys();
+  }
+
+}
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * Determine whether the given HTTP method may include a body.
+ */
+
+
+function mightHaveBody(method) {
+  switch (method) {
+    case 'DELETE':
+    case 'GET':
+    case 'HEAD':
+    case 'OPTIONS':
+    case 'JSONP':
+      return false;
+
+    default:
+      return true;
+  }
+}
+/**
+ * Safely assert whether the given value is an ArrayBuffer.
+ *
+ * In some execution environments ArrayBuffer is not defined.
+ */
+
+
+function isArrayBuffer(value) {
+  return typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer;
+}
+/**
+ * Safely assert whether the given value is a Blob.
+ *
+ * In some execution environments Blob is not defined.
+ */
+
+
+function isBlob(value) {
+  return typeof Blob !== 'undefined' && value instanceof Blob;
+}
+/**
+ * Safely assert whether the given value is a FormData instance.
+ *
+ * In some execution environments FormData is not defined.
+ */
+
+
+function isFormData(value) {
+  return typeof FormData !== 'undefined' && value instanceof FormData;
+}
+/**
+ * Safely assert whether the given value is a URLSearchParams instance.
+ *
+ * In some execution environments URLSearchParams is not defined.
+ */
+
+
+function isUrlSearchParams(value) {
+  return typeof URLSearchParams !== 'undefined' && value instanceof URLSearchParams;
+}
+/**
+ * An outgoing HTTP request with an optional typed body.
+ *
+ * `HttpRequest` represents an outgoing request, including URL, method,
+ * headers, body, and other request configuration options. Instances should be
+ * assumed to be immutable. To modify a `HttpRequest`, the `clone`
+ * method should be used.
+ *
+ * @publicApi
+ */
+
+
+class HttpRequest {
+  constructor(method, url, third, fourth) {
+    this.url = url;
+    /**
+     * The request body, or `null` if one isn't set.
+     *
+     * Bodies are not enforced to be immutable, as they can include a reference to any
+     * user-defined data type. However, interceptors should take care to preserve
+     * idempotence by treating them as such.
+     */
+
+    this.body = null;
+    /**
+     * Whether this request should be made in a way that exposes progress events.
+     *
+     * Progress events are expensive (change detection runs on each event) and so
+     * they should only be requested if the consumer intends to monitor them.
+     */
+
+    this.reportProgress = false;
+    /**
+     * Whether this request should be sent with outgoing credentials (cookies).
+     */
+
+    this.withCredentials = false;
+    /**
+     * The expected response type of the server.
+     *
+     * This is used to parse the response appropriately before returning it to
+     * the requestee.
+     */
+
+    this.responseType = 'json';
+    this.method = method.toUpperCase(); // Next, need to figure out which argument holds the HttpRequestInit
+    // options, if any.
+
+    let options; // Check whether a body argument is expected. The only valid way to omit
+    // the body argument is to use a known no-body method like GET.
+
+    if (mightHaveBody(this.method) || !!fourth) {
+      // Body is the third argument, options are the fourth.
+      this.body = third !== undefined ? third : null;
+      options = fourth;
+    } else {
+      // No body required, options are the third argument. The body stays null.
+      options = third;
+    } // If options have been passed, interpret them.
+
+
+    if (options) {
+      // Normalize reportProgress and withCredentials.
+      this.reportProgress = !!options.reportProgress;
+      this.withCredentials = !!options.withCredentials; // Override default response type of 'json' if one is provided.
+
+      if (!!options.responseType) {
+        this.responseType = options.responseType;
+      } // Override headers if they're provided.
+
+
+      if (!!options.headers) {
+        this.headers = options.headers;
+      }
+
+      if (!!options.context) {
+        this.context = options.context;
+      }
+
+      if (!!options.params) {
+        this.params = options.params;
+      }
+    } // If no headers have been passed in, construct a new HttpHeaders instance.
+
+
+    if (!this.headers) {
+      this.headers = new HttpHeaders();
+    } // If no context have been passed in, construct a new HttpContext instance.
+
+
+    if (!this.context) {
+      this.context = new HttpContext();
+    } // If no parameters have been passed in, construct a new HttpUrlEncodedParams instance.
+
+
+    if (!this.params) {
+      this.params = new HttpParams();
+      this.urlWithParams = url;
+    } else {
+      // Encode the parameters to a string in preparation for inclusion in the URL.
+      const params = this.params.toString();
+
+      if (params.length === 0) {
+        // No parameters, the visible URL is just the URL given at creation time.
+        this.urlWithParams = url;
+      } else {
+        // Does the URL already have query parameters? Look for '?'.
+        const qIdx = url.indexOf('?'); // There are 3 cases to handle:
+        // 1) No existing parameters -> append '?' followed by params.
+        // 2) '?' exists and is followed by existing query string ->
+        //    append '&' followed by params.
+        // 3) '?' exists at the end of the url -> append params directly.
+        // This basically amounts to determining the character, if any, with
+        // which to join the URL and parameters.
+
+        const sep = qIdx === -1 ? '?' : qIdx < url.length - 1 ? '&' : '';
+        this.urlWithParams = url + sep + params;
+      }
+    }
+  }
+  /**
+   * Transform the free-form body into a serialized format suitable for
+   * transmission to the server.
+   */
+
+
+  serializeBody() {
+    // If no body is present, no need to serialize it.
+    if (this.body === null) {
+      return null;
+    } // Check whether the body is already in a serialized form. If so,
+    // it can just be returned directly.
+
+
+    if (isArrayBuffer(this.body) || isBlob(this.body) || isFormData(this.body) || isUrlSearchParams(this.body) || typeof this.body === 'string') {
+      return this.body;
+    } // Check whether the body is an instance of HttpUrlEncodedParams.
+
+
+    if (this.body instanceof HttpParams) {
+      return this.body.toString();
+    } // Check whether the body is an object or array, and serialize with JSON if so.
+
+
+    if (typeof this.body === 'object' || typeof this.body === 'boolean' || Array.isArray(this.body)) {
+      return JSON.stringify(this.body);
+    } // Fall back on toString() for everything else.
+
+
+    return this.body.toString();
+  }
+  /**
+   * Examine the body and attempt to infer an appropriate MIME type
+   * for it.
+   *
+   * If no such type can be inferred, this method will return `null`.
+   */
+
+
+  detectContentTypeHeader() {
+    // An empty body has no content type.
+    if (this.body === null) {
+      return null;
+    } // FormData bodies rely on the browser's content type assignment.
+
+
+    if (isFormData(this.body)) {
+      return null;
+    } // Blobs usually have their own content type. If it doesn't, then
+    // no type can be inferred.
+
+
+    if (isBlob(this.body)) {
+      return this.body.type || null;
+    } // Array buffers have unknown contents and thus no type can be inferred.
+
+
+    if (isArrayBuffer(this.body)) {
+      return null;
+    } // Technically, strings could be a form of JSON data, but it's safe enough
+    // to assume they're plain strings.
+
+
+    if (typeof this.body === 'string') {
+      return 'text/plain';
+    } // `HttpUrlEncodedParams` has its own content-type.
+
+
+    if (this.body instanceof HttpParams) {
+      return 'application/x-www-form-urlencoded;charset=UTF-8';
+    } // Arrays, objects, boolean and numbers will be encoded as JSON.
+
+
+    if (typeof this.body === 'object' || typeof this.body === 'number' || typeof this.body === 'boolean') {
+      return 'application/json';
+    } // No type could be inferred.
+
+
+    return null;
+  }
+
+  clone(update = {}) {
+    var _a; // For method, url, and responseType, take the current value unless
+    // it is overridden in the update hash.
+
+
+    const method = update.method || this.method;
+    const url = update.url || this.url;
+    const responseType = update.responseType || this.responseType; // The body is somewhat special - a `null` value in update.body means
+    // whatever current body is present is being overridden with an empty
+    // body, whereas an `undefined` value in update.body implies no
+    // override.
+
+    const body = update.body !== undefined ? update.body : this.body; // Carefully handle the boolean options to differentiate between
+    // `false` and `undefined` in the update args.
+
+    const withCredentials = update.withCredentials !== undefined ? update.withCredentials : this.withCredentials;
+    const reportProgress = update.reportProgress !== undefined ? update.reportProgress : this.reportProgress; // Headers and params may be appended to if `setHeaders` or
+    // `setParams` are used.
+
+    let headers = update.headers || this.headers;
+    let params = update.params || this.params; // Pass on context if needed
+
+    const context = (_a = update.context) !== null && _a !== void 0 ? _a : this.context; // Check whether the caller has asked to add headers.
+
+    if (update.setHeaders !== undefined) {
+      // Set every requested header.
+      headers = Object.keys(update.setHeaders).reduce((headers, name) => headers.set(name, update.setHeaders[name]), headers);
+    } // Check whether the caller has asked to set params.
+
+
+    if (update.setParams) {
+      // Set every requested param.
+      params = Object.keys(update.setParams).reduce((params, param) => params.set(param, update.setParams[param]), params);
+    } // Finally, construct the new HttpRequest using the pieces from above.
+
+
+    return new HttpRequest(method, url, body, {
+      params,
+      headers,
+      context,
+      reportProgress,
+      responseType,
+      withCredentials
+    });
+  }
+
+}
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * Type enumeration for the different kinds of `HttpEvent`.
+ *
+ * @publicApi
+ */
+
+
+var HttpEventType;
+
+(function (HttpEventType) {
+  /**
+   * The request was sent out over the wire.
+   */
+  HttpEventType[HttpEventType["Sent"] = 0] = "Sent";
+  /**
+   * An upload progress event was received.
+   */
+
+  HttpEventType[HttpEventType["UploadProgress"] = 1] = "UploadProgress";
+  /**
+   * The response status code and headers were received.
+   */
+
+  HttpEventType[HttpEventType["ResponseHeader"] = 2] = "ResponseHeader";
+  /**
+   * A download progress event was received.
+   */
+
+  HttpEventType[HttpEventType["DownloadProgress"] = 3] = "DownloadProgress";
+  /**
+   * The full response including the body was received.
+   */
+
+  HttpEventType[HttpEventType["Response"] = 4] = "Response";
+  /**
+   * A custom event from an interceptor or a backend.
+   */
+
+  HttpEventType[HttpEventType["User"] = 5] = "User";
+})(HttpEventType || (HttpEventType = {}));
+/**
+ * Base class for both `HttpResponse` and `HttpHeaderResponse`.
+ *
+ * @publicApi
+ */
+
+
+class HttpResponseBase {
+  /**
+   * Super-constructor for all responses.
+   *
+   * The single parameter accepted is an initialization hash. Any properties
+   * of the response passed there will override the default values.
+   */
+  constructor(init, defaultStatus = 200
+  /* Ok */
+  , defaultStatusText = 'OK') {
+    // If the hash has values passed, use them to initialize the response.
+    // Otherwise use the default values.
+    this.headers = init.headers || new HttpHeaders();
+    this.status = init.status !== undefined ? init.status : defaultStatus;
+    this.statusText = init.statusText || defaultStatusText;
+    this.url = init.url || null; // Cache the ok value to avoid defining a getter.
+
+    this.ok = this.status >= 200 && this.status < 300;
+  }
+
+}
+/**
+ * A partial HTTP response which only includes the status and header data,
+ * but no response body.
+ *
+ * `HttpHeaderResponse` is a `HttpEvent` available on the response
+ * event stream, only when progress events are requested.
+ *
+ * @publicApi
+ */
+
+
+class HttpHeaderResponse extends HttpResponseBase {
+  /**
+   * Create a new `HttpHeaderResponse` with the given parameters.
+   */
+  constructor(init = {}) {
+    super(init);
+    this.type = HttpEventType.ResponseHeader;
+  }
+  /**
+   * Copy this `HttpHeaderResponse`, overriding its contents with the
+   * given parameter hash.
+   */
+
+
+  clone(update = {}) {
+    // Perform a straightforward initialization of the new HttpHeaderResponse,
+    // overriding the current parameters with new ones if given.
+    return new HttpHeaderResponse({
+      headers: update.headers || this.headers,
+      status: update.status !== undefined ? update.status : this.status,
+      statusText: update.statusText || this.statusText,
+      url: update.url || this.url || undefined
+    });
+  }
+
+}
+/**
+ * A full HTTP response, including a typed response body (which may be `null`
+ * if one was not returned).
+ *
+ * `HttpResponse` is a `HttpEvent` available on the response event
+ * stream.
+ *
+ * @publicApi
+ */
+
+
+class HttpResponse extends HttpResponseBase {
+  /**
+   * Construct a new `HttpResponse`.
+   */
+  constructor(init = {}) {
+    super(init);
+    this.type = HttpEventType.Response;
+    this.body = init.body !== undefined ? init.body : null;
+  }
+
+  clone(update = {}) {
+    return new HttpResponse({
+      body: update.body !== undefined ? update.body : this.body,
+      headers: update.headers || this.headers,
+      status: update.status !== undefined ? update.status : this.status,
+      statusText: update.statusText || this.statusText,
+      url: update.url || this.url || undefined
+    });
+  }
+
+}
+/**
+ * A response that represents an error or failure, either from a
+ * non-successful HTTP status, an error while executing the request,
+ * or some other failure which occurred during the parsing of the response.
+ *
+ * Any error returned on the `Observable` response stream will be
+ * wrapped in an `HttpErrorResponse` to provide additional context about
+ * the state of the HTTP layer when the error occurred. The error property
+ * will contain either a wrapped Error object or the error response returned
+ * from the server.
+ *
+ * @publicApi
+ */
+
+
+class HttpErrorResponse extends HttpResponseBase {
+  constructor(init) {
+    // Initialize with a default status of 0 / Unknown Error.
+    super(init, 0, 'Unknown Error');
+    this.name = 'HttpErrorResponse';
+    /**
+     * Errors are never okay, even when the status code is in the 2xx success range.
+     */
+
+    this.ok = false; // If the response was successful, then this was a parse error. Otherwise, it was
+    // a protocol-level failure of some sort. Either the request failed in transit
+    // or the server returned an unsuccessful status code.
+
+    if (this.status >= 200 && this.status < 300) {
+      this.message = `Http failure during parsing for ${init.url || '(unknown url)'}`;
+    } else {
+      this.message = `Http failure response for ${init.url || '(unknown url)'}: ${init.status} ${init.statusText}`;
+    }
+
+    this.error = init.error || null;
+  }
+
+}
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * Constructs an instance of `HttpRequestOptions<T>` from a source `HttpMethodOptions` and
+ * the given `body`. This function clones the object and adds the body.
+ *
+ * Note that the `responseType` *options* value is a String that identifies the
+ * single data type of the response.
+ * A single overload version of the method handles each response type.
+ * The value of `responseType` cannot be a union, as the combined signature could imply.
+ *
+ */
+
+
+function addBody(options, body) {
+  return {
+    body,
+    headers: options.headers,
+    context: options.context,
+    observe: options.observe,
+    params: options.params,
+    reportProgress: options.reportProgress,
+    responseType: options.responseType,
+    withCredentials: options.withCredentials
+  };
+}
+/**
+ * Performs HTTP requests.
+ * This service is available as an injectable class, with methods to perform HTTP requests.
+ * Each request method has multiple signatures, and the return type varies based on
+ * the signature that is called (mainly the values of `observe` and `responseType`).
+ *
+ * Note that the `responseType` *options* value is a String that identifies the
+ * single data type of the response.
+ * A single overload version of the method handles each response type.
+ * The value of `responseType` cannot be a union, as the combined signature could imply.
+
+ *
+ * @usageNotes
+ * Sample HTTP requests for the [Tour of Heroes](/tutorial/toh-pt0) application.
+ *
+ * ### HTTP Request Example
+ *
+ * ```
+ *  // GET heroes whose name contains search term
+ * searchHeroes(term: string): observable<Hero[]>{
+ *
+ *  const params = new HttpParams({fromString: 'name=term'});
+ *    return this.httpClient.request('GET', this.heroesUrl, {responseType:'json', params});
+ * }
+ * ```
+ *
+ * Alternatively, the parameter string can be used without invoking HttpParams
+ * by directly joining to the URL.
+ * ```
+ * this.httpClient.request('GET', this.heroesUrl + '?' + 'name=term', {responseType:'json'});
+ * ```
+ *
+ *
+ * ### JSONP Example
+ * ```
+ * requestJsonp(url, callback = 'callback') {
+ *  return this.httpClient.jsonp(this.heroesURL, callback);
+ * }
+ * ```
+ *
+ * ### PATCH Example
+ * ```
+ * // PATCH one of the heroes' name
+ * patchHero (id: number, heroName: string): Observable<{}> {
+ * const url = `${this.heroesUrl}/${id}`;   // PATCH api/heroes/42
+ *  return this.httpClient.patch(url, {name: heroName}, httpOptions)
+ *    .pipe(catchError(this.handleError('patchHero')));
+ * }
+ * ```
+ *
+ * @see [HTTP Guide](guide/http)
+ * @see [HTTP Request](api/common/http/HttpRequest)
+ *
+ * @publicApi
+ */
+
+
+class HttpClient {
+  constructor(handler) {
+    this.handler = handler;
+  }
+  /**
+   * Constructs an observable for a generic HTTP request that, when subscribed,
+   * fires the request through the chain of registered interceptors and on to the
+   * server.
+   *
+   * You can pass an `HttpRequest` directly as the only parameter. In this case,
+   * the call returns an observable of the raw `HttpEvent` stream.
+   *
+   * Alternatively you can pass an HTTP method as the first parameter,
+   * a URL string as the second, and an options hash containing the request body as the third.
+   * See `addBody()`. In this case, the specified `responseType` and `observe` options determine the
+   * type of returned observable.
+   *   * The `responseType` value determines how a successful response body is parsed.
+   *   * If `responseType` is the default `json`, you can pass a type interface for the resulting
+   * object as a type parameter to the call.
+   *
+   * The `observe` value determines the return type, according to what you are interested in
+   * observing.
+   *   * An `observe` value of events returns an observable of the raw `HttpEvent` stream, including
+   * progress events by default.
+   *   * An `observe` value of response returns an observable of `HttpResponse<T>`,
+   * where the `T` parameter depends on the `responseType` and any optionally provided type
+   * parameter.
+   *   * An `observe` value of body returns an observable of `<T>` with the same `T` body type.
+   *
+   */
+
+
+  request(first, url, options = {}) {
+    let req; // First, check whether the primary argument is an instance of `HttpRequest`.
+
+    if (first instanceof HttpRequest) {
+      // It is. The other arguments must be undefined (per the signatures) and can be
+      // ignored.
+      req = first;
+    } else {
+      // It's a string, so it represents a URL. Construct a request based on it,
+      // and incorporate the remaining arguments (assuming `GET` unless a method is
+      // provided.
+      // Figure out the headers.
+      let headers = undefined;
+
+      if (options.headers instanceof HttpHeaders) {
+        headers = options.headers;
+      } else {
+        headers = new HttpHeaders(options.headers);
+      } // Sort out parameters.
+
+
+      let params = undefined;
+
+      if (!!options.params) {
+        if (options.params instanceof HttpParams) {
+          params = options.params;
+        } else {
+          params = new HttpParams({
+            fromObject: options.params
+          });
+        }
+      } // Construct the request.
+
+
+      req = new HttpRequest(first, url, options.body !== undefined ? options.body : null, {
+        headers,
+        context: options.context,
+        params,
+        reportProgress: options.reportProgress,
+        // By default, JSON is assumed to be returned for all calls.
+        responseType: options.responseType || 'json',
+        withCredentials: options.withCredentials
+      });
+    } // Start with an Observable.of() the initial request, and run the handler (which
+    // includes all interceptors) inside a concatMap(). This way, the handler runs
+    // inside an Observable chain, which causes interceptors to be re-run on every
+    // subscription (this also makes retries re-run the handler, including interceptors).
+
+
+    const events$ = (0,rxjs__WEBPACK_IMPORTED_MODULE_0__.of)(req).pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_1__.concatMap)(req => this.handler.handle(req))); // If coming via the API signature which accepts a previously constructed HttpRequest,
+    // the only option is to get the event stream. Otherwise, return the event stream if
+    // that is what was requested.
+
+    if (first instanceof HttpRequest || options.observe === 'events') {
+      return events$;
+    } // The requested stream contains either the full response or the body. In either
+    // case, the first step is to filter the event stream to extract a stream of
+    // responses(s).
+
+
+    const res$ = events$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_2__.filter)(event => event instanceof HttpResponse)); // Decide which stream to return.
+
+    switch (options.observe || 'body') {
+      case 'body':
+        // The requested stream is the body. Map the response stream to the response
+        // body. This could be done more simply, but a misbehaving interceptor might
+        // transform the response body into a different format and ignore the requested
+        // responseType. Guard against this by validating that the response is of the
+        // requested type.
+        switch (req.responseType) {
+          case 'arraybuffer':
+            return res$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_3__.map)(res => {
+              // Validate that the body is an ArrayBuffer.
+              if (res.body !== null && !(res.body instanceof ArrayBuffer)) {
+                throw new Error('Response is not an ArrayBuffer.');
+              }
+
+              return res.body;
+            }));
+
+          case 'blob':
+            return res$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_3__.map)(res => {
+              // Validate that the body is a Blob.
+              if (res.body !== null && !(res.body instanceof Blob)) {
+                throw new Error('Response is not a Blob.');
+              }
+
+              return res.body;
+            }));
+
+          case 'text':
+            return res$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_3__.map)(res => {
+              // Validate that the body is a string.
+              if (res.body !== null && typeof res.body !== 'string') {
+                throw new Error('Response is not a string.');
+              }
+
+              return res.body;
+            }));
+
+          case 'json':
+          default:
+            // No validation needed for JSON responses, as they can be of any type.
+            return res$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_3__.map)(res => res.body));
+        }
+
+      case 'response':
+        // The response stream was requested directly, so return it.
+        return res$;
+
+      default:
+        // Guard against new future observe types being added.
+        throw new Error(`Unreachable: unhandled observe type ${options.observe}}`);
+    }
+  }
+  /**
+   * Constructs an observable that, when subscribed, causes the configured
+   * `DELETE` request to execute on the server. See the individual overloads for
+   * details on the return type.
+   *
+   * @param url     The endpoint URL.
+   * @param options The HTTP options to send with the request.
+   *
+   */
+
+
+  delete(url, options = {}) {
+    return this.request('DELETE', url, options);
+  }
+  /**
+   * Constructs an observable that, when subscribed, causes the configured
+   * `GET` request to execute on the server. See the individual overloads for
+   * details on the return type.
+   */
+
+
+  get(url, options = {}) {
+    return this.request('GET', url, options);
+  }
+  /**
+   * Constructs an observable that, when subscribed, causes the configured
+   * `HEAD` request to execute on the server. The `HEAD` method returns
+   * meta information about the resource without transferring the
+   * resource itself. See the individual overloads for
+   * details on the return type.
+   */
+
+
+  head(url, options = {}) {
+    return this.request('HEAD', url, options);
+  }
+  /**
+   * Constructs an `Observable` that, when subscribed, causes a request with the special method
+   * `JSONP` to be dispatched via the interceptor pipeline.
+   * The [JSONP pattern](https://en.wikipedia.org/wiki/JSONP) works around limitations of certain
+   * API endpoints that don't support newer,
+   * and preferable [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) protocol.
+   * JSONP treats the endpoint API as a JavaScript file and tricks the browser to process the
+   * requests even if the API endpoint is not located on the same domain (origin) as the client-side
+   * application making the request.
+   * The endpoint API must support JSONP callback for JSONP requests to work.
+   * The resource API returns the JSON response wrapped in a callback function.
+   * You can pass the callback function name as one of the query parameters.
+   * Note that JSONP requests can only be used with `GET` requests.
+   *
+   * @param url The resource URL.
+   * @param callbackParam The callback function name.
+   *
+   */
+
+
+  jsonp(url, callbackParam) {
+    return this.request('JSONP', url, {
+      params: new HttpParams().append(callbackParam, 'JSONP_CALLBACK'),
+      observe: 'body',
+      responseType: 'json'
+    });
+  }
+  /**
+   * Constructs an `Observable` that, when subscribed, causes the configured
+   * `OPTIONS` request to execute on the server. This method allows the client
+   * to determine the supported HTTP methods and other capabilities of an endpoint,
+   * without implying a resource action. See the individual overloads for
+   * details on the return type.
+   */
+
+
+  options(url, options = {}) {
+    return this.request('OPTIONS', url, options);
+  }
+  /**
+   * Constructs an observable that, when subscribed, causes the configured
+   * `PATCH` request to execute on the server. See the individual overloads for
+   * details on the return type.
+   */
+
+
+  patch(url, body, options = {}) {
+    return this.request('PATCH', url, addBody(options, body));
+  }
+  /**
+   * Constructs an observable that, when subscribed, causes the configured
+   * `POST` request to execute on the server. The server responds with the location of
+   * the replaced resource. See the individual overloads for
+   * details on the return type.
+   */
+
+
+  post(url, body, options = {}) {
+    return this.request('POST', url, addBody(options, body));
+  }
+  /**
+   * Constructs an observable that, when subscribed, causes the configured
+   * `PUT` request to execute on the server. The `PUT` method replaces an existing resource
+   * with a new set of values.
+   * See the individual overloads for details on the return type.
+   */
+
+
+  put(url, body, options = {}) {
+    return this.request('PUT', url, addBody(options, body));
+  }
+
+}
+
+HttpClient.ɵfac = function HttpClient_Factory(t) {
+  return new (t || HttpClient)(_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](HttpHandler));
+};
+
+HttpClient.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjectable"]({
+  token: HttpClient,
+  factory: HttpClient.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](HttpClient, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Injectable
+  }], function () {
+    return [{
+      type: HttpHandler
+    }];
+  }, null);
+})();
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * `HttpHandler` which applies an `HttpInterceptor` to an `HttpRequest`.
+ *
+ *
+ */
+
+
+class HttpInterceptorHandler {
+  constructor(next, interceptor) {
+    this.next = next;
+    this.interceptor = interceptor;
+  }
+
+  handle(req) {
+    return this.interceptor.intercept(req, this.next);
+  }
+
+}
+/**
+ * A multi-provider token that represents the array of registered
+ * `HttpInterceptor` objects.
+ *
+ * @publicApi
+ */
+
+
+const HTTP_INTERCEPTORS = new _angular_core__WEBPACK_IMPORTED_MODULE_4__.InjectionToken('HTTP_INTERCEPTORS');
+
+class NoopInterceptor {
+  intercept(req, next) {
+    return next.handle(req);
+  }
+
+}
+
+NoopInterceptor.ɵfac = function NoopInterceptor_Factory(t) {
+  return new (t || NoopInterceptor)();
+};
+
+NoopInterceptor.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjectable"]({
+  token: NoopInterceptor,
+  factory: NoopInterceptor.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](NoopInterceptor, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Injectable
+  }], null, null);
+})();
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+// Every request made through JSONP needs a callback name that's unique across the
+// whole page. Each request is assigned an id and the callback name is constructed
+// from that. The next id to be assigned is tracked in a global variable here that
+// is shared among all applications on the page.
+
+
+let nextRequestId = 0;
+/**
+ * When a pending <script> is unsubscribed we'll move it to this document, so it won't be
+ * executed.
+ */
+
+let foreignDocument; // Error text given when a JSONP script is injected, but doesn't invoke the callback
+// passed in its URL.
+
+const JSONP_ERR_NO_CALLBACK = 'JSONP injected script did not invoke callback.'; // Error text given when a request is passed to the JsonpClientBackend that doesn't
+// have a request method JSONP.
+
+const JSONP_ERR_WRONG_METHOD = 'JSONP requests must use JSONP request method.';
+const JSONP_ERR_WRONG_RESPONSE_TYPE = 'JSONP requests must use Json response type.';
+/**
+ * DI token/abstract type representing a map of JSONP callbacks.
+ *
+ * In the browser, this should always be the `window` object.
+ *
+ *
+ */
+
+class JsonpCallbackContext {}
+/**
+ * Processes an `HttpRequest` with the JSONP method,
+ * by performing JSONP style requests.
+ * @see `HttpHandler`
+ * @see `HttpXhrBackend`
+ *
+ * @publicApi
+ */
+
+
+class JsonpClientBackend {
+  constructor(callbackMap, document) {
+    this.callbackMap = callbackMap;
+    this.document = document;
+    /**
+     * A resolved promise that can be used to schedule microtasks in the event handlers.
+     */
+
+    this.resolvedPromise = Promise.resolve();
+  }
+  /**
+   * Get the name of the next callback method, by incrementing the global `nextRequestId`.
+   */
+
+
+  nextCallback() {
+    return `ng_jsonp_callback_${nextRequestId++}`;
+  }
+  /**
+   * Processes a JSONP request and returns an event stream of the results.
+   * @param req The request object.
+   * @returns An observable of the response events.
+   *
+   */
+
+
+  handle(req) {
+    // Firstly, check both the method and response type. If either doesn't match
+    // then the request was improperly routed here and cannot be handled.
+    if (req.method !== 'JSONP') {
+      throw new Error(JSONP_ERR_WRONG_METHOD);
+    } else if (req.responseType !== 'json') {
+      throw new Error(JSONP_ERR_WRONG_RESPONSE_TYPE);
+    } // Everything else happens inside the Observable boundary.
+
+
+    return new rxjs__WEBPACK_IMPORTED_MODULE_5__.Observable(observer => {
+      // The first step to make a request is to generate the callback name, and replace the
+      // callback placeholder in the URL with the name. Care has to be taken here to ensure
+      // a trailing &, if matched, gets inserted back into the URL in the correct place.
+      const callback = this.nextCallback();
+      const url = req.urlWithParams.replace(/=JSONP_CALLBACK(&|$)/, `=${callback}$1`); // Construct the <script> tag and point it at the URL.
+
+      const node = this.document.createElement('script');
+      node.src = url; // A JSONP request requires waiting for multiple callbacks. These variables
+      // are closed over and track state across those callbacks.
+      // The response object, if one has been received, or null otherwise.
+
+      let body = null; // Whether the response callback has been called.
+
+      let finished = false; // Set the response callback in this.callbackMap (which will be the window
+      // object in the browser. The script being loaded via the <script> tag will
+      // eventually call this callback.
+
+      this.callbackMap[callback] = data => {
+        // Data has been received from the JSONP script. Firstly, delete this callback.
+        delete this.callbackMap[callback]; // Set state to indicate data was received.
+
+        body = data;
+        finished = true;
+      }; // cleanup() is a utility closure that removes the <script> from the page and
+      // the response callback from the window. This logic is used in both the
+      // success, error, and cancellation paths, so it's extracted out for convenience.
+
+
+      const cleanup = () => {
+        // Remove the <script> tag if it's still on the page.
+        if (node.parentNode) {
+          node.parentNode.removeChild(node);
+        } // Remove the response callback from the callbackMap (window object in the
+        // browser).
+
+
+        delete this.callbackMap[callback];
+      }; // onLoad() is the success callback which runs after the response callback
+      // if the JSONP script loads successfully. The event itself is unimportant.
+      // If something went wrong, onLoad() may run without the response callback
+      // having been invoked.
+
+
+      const onLoad = event => {
+        // We wrap it in an extra Promise, to ensure the microtask
+        // is scheduled after the loaded endpoint has executed any potential microtask itself,
+        // which is not guaranteed in Internet Explorer and EdgeHTML. See issue #39496
+        this.resolvedPromise.then(() => {
+          // Cleanup the page.
+          cleanup(); // Check whether the response callback has run.
+
+          if (!finished) {
+            // It hasn't, something went wrong with the request. Return an error via
+            // the Observable error path. All JSONP errors have status 0.
+            observer.error(new HttpErrorResponse({
+              url,
+              status: 0,
+              statusText: 'JSONP Error',
+              error: new Error(JSONP_ERR_NO_CALLBACK)
+            }));
+            return;
+          } // Success. body either contains the response body or null if none was
+          // returned.
+
+
+          observer.next(new HttpResponse({
+            body,
+            status: 200
+            /* Ok */
+            ,
+            statusText: 'OK',
+            url
+          })); // Complete the stream, the response is over.
+
+          observer.complete();
+        });
+      }; // onError() is the error callback, which runs if the script returned generates
+      // a Javascript error. It emits the error via the Observable error channel as
+      // a HttpErrorResponse.
+
+
+      const onError = error => {
+        cleanup(); // Wrap the error in a HttpErrorResponse.
+
+        observer.error(new HttpErrorResponse({
+          error,
+          status: 0,
+          statusText: 'JSONP Error',
+          url
+        }));
+      }; // Subscribe to both the success (load) and error events on the <script> tag,
+      // and add it to the page.
+
+
+      node.addEventListener('load', onLoad);
+      node.addEventListener('error', onError);
+      this.document.body.appendChild(node); // The request has now been successfully sent.
+
+      observer.next({
+        type: HttpEventType.Sent
+      }); // Cancellation handler.
+
+      return () => {
+        if (!finished) {
+          this.removeListeners(node);
+        } // And finally, clean up the page.
+
+
+        cleanup();
+      };
+    });
+  }
+
+  removeListeners(script) {
+    // Issue #34818
+    // Changing <script>'s ownerDocument will prevent it from execution.
+    // https://html.spec.whatwg.org/multipage/scripting.html#execute-the-script-block
+    if (!foreignDocument) {
+      foreignDocument = this.document.implementation.createHTMLDocument();
+    }
+
+    foreignDocument.adoptNode(script);
+  }
+
+}
+
+JsonpClientBackend.ɵfac = function JsonpClientBackend_Factory(t) {
+  return new (t || JsonpClientBackend)(_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](JsonpCallbackContext), _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_6__.DOCUMENT));
+};
+
+JsonpClientBackend.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjectable"]({
+  token: JsonpClientBackend,
+  factory: JsonpClientBackend.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](JsonpClientBackend, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Injectable
+  }], function () {
+    return [{
+      type: JsonpCallbackContext
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Inject,
+        args: [_angular_common__WEBPACK_IMPORTED_MODULE_6__.DOCUMENT]
+      }]
+    }];
+  }, null);
+})();
+/**
+ * Identifies requests with the method JSONP and
+ * shifts them to the `JsonpClientBackend`.
+ *
+ * @see `HttpInterceptor`
+ *
+ * @publicApi
+ */
+
+
+class JsonpInterceptor {
+  constructor(jsonp) {
+    this.jsonp = jsonp;
+  }
+  /**
+   * Identifies and handles a given JSONP request.
+   * @param req The outgoing request object to handle.
+   * @param next The next interceptor in the chain, or the backend
+   * if no interceptors remain in the chain.
+   * @returns An observable of the event stream.
+   */
+
+
+  intercept(req, next) {
+    if (req.method === 'JSONP') {
+      return this.jsonp.handle(req);
+    } // Fall through for normal HTTP requests.
+
+
+    return next.handle(req);
+  }
+
+}
+
+JsonpInterceptor.ɵfac = function JsonpInterceptor_Factory(t) {
+  return new (t || JsonpInterceptor)(_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](JsonpClientBackend));
+};
+
+JsonpInterceptor.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjectable"]({
+  token: JsonpInterceptor,
+  factory: JsonpInterceptor.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](JsonpInterceptor, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Injectable
+  }], function () {
+    return [{
+      type: JsonpClientBackend
+    }];
+  }, null);
+})();
+
+const XSSI_PREFIX = /^\)\]\}',?\n/;
+/**
+ * Determine an appropriate URL for the response, by checking either
+ * XMLHttpRequest.responseURL or the X-Request-URL header.
+ */
+
+function getResponseUrl(xhr) {
+  if ('responseURL' in xhr && xhr.responseURL) {
+    return xhr.responseURL;
+  }
+
+  if (/^X-Request-URL:/m.test(xhr.getAllResponseHeaders())) {
+    return xhr.getResponseHeader('X-Request-URL');
+  }
+
+  return null;
+}
+/**
+ * Uses `XMLHttpRequest` to send requests to a backend server.
+ * @see `HttpHandler`
+ * @see `JsonpClientBackend`
+ *
+ * @publicApi
+ */
+
+
+class HttpXhrBackend {
+  constructor(xhrFactory) {
+    this.xhrFactory = xhrFactory;
+  }
+  /**
+   * Processes a request and returns a stream of response events.
+   * @param req The request object.
+   * @returns An observable of the response events.
+   */
+
+
+  handle(req) {
+    // Quick check to give a better error message when a user attempts to use
+    // HttpClient.jsonp() without installing the HttpClientJsonpModule
+    if (req.method === 'JSONP') {
+      throw new Error(`Attempted to construct Jsonp request without HttpClientJsonpModule installed.`);
+    } // Everything happens on Observable subscription.
+
+
+    return new rxjs__WEBPACK_IMPORTED_MODULE_5__.Observable(observer => {
+      // Start by setting up the XHR object with request method, URL, and withCredentials flag.
+      const xhr = this.xhrFactory.build();
+      xhr.open(req.method, req.urlWithParams);
+
+      if (!!req.withCredentials) {
+        xhr.withCredentials = true;
+      } // Add all the requested headers.
+
+
+      req.headers.forEach((name, values) => xhr.setRequestHeader(name, values.join(','))); // Add an Accept header if one isn't present already.
+
+      if (!req.headers.has('Accept')) {
+        xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
+      } // Auto-detect the Content-Type header if one isn't present already.
+
+
+      if (!req.headers.has('Content-Type')) {
+        const detectedType = req.detectContentTypeHeader(); // Sometimes Content-Type detection fails.
+
+        if (detectedType !== null) {
+          xhr.setRequestHeader('Content-Type', detectedType);
+        }
+      } // Set the responseType if one was requested.
+
+
+      if (req.responseType) {
+        const responseType = req.responseType.toLowerCase(); // JSON responses need to be processed as text. This is because if the server
+        // returns an XSSI-prefixed JSON response, the browser will fail to parse it,
+        // xhr.response will be null, and xhr.responseText cannot be accessed to
+        // retrieve the prefixed JSON data in order to strip the prefix. Thus, all JSON
+        // is parsed by first requesting text and then applying JSON.parse.
+
+        xhr.responseType = responseType !== 'json' ? responseType : 'text';
+      } // Serialize the request body if one is present. If not, this will be set to null.
+
+
+      const reqBody = req.serializeBody(); // If progress events are enabled, response headers will be delivered
+      // in two events - the HttpHeaderResponse event and the full HttpResponse
+      // event. However, since response headers don't change in between these
+      // two events, it doesn't make sense to parse them twice. So headerResponse
+      // caches the data extracted from the response whenever it's first parsed,
+      // to ensure parsing isn't duplicated.
+
+      let headerResponse = null; // partialFromXhr extracts the HttpHeaderResponse from the current XMLHttpRequest
+      // state, and memoizes it into headerResponse.
+
+      const partialFromXhr = () => {
+        if (headerResponse !== null) {
+          return headerResponse;
+        }
+
+        const statusText = xhr.statusText || 'OK'; // Parse headers from XMLHttpRequest - this step is lazy.
+
+        const headers = new HttpHeaders(xhr.getAllResponseHeaders()); // Read the response URL from the XMLHttpResponse instance and fall back on the
+        // request URL.
+
+        const url = getResponseUrl(xhr) || req.url; // Construct the HttpHeaderResponse and memoize it.
+
+        headerResponse = new HttpHeaderResponse({
+          headers,
+          status: xhr.status,
+          statusText,
+          url
+        });
+        return headerResponse;
+      }; // Next, a few closures are defined for the various events which XMLHttpRequest can
+      // emit. This allows them to be unregistered as event listeners later.
+      // First up is the load event, which represents a response being fully available.
+
+
+      const onLoad = () => {
+        // Read response state from the memoized partial data.
+        let {
+          headers,
+          status,
+          statusText,
+          url
+        } = partialFromXhr(); // The body will be read out if present.
+
+        let body = null;
+
+        if (status !== 204
+        /* NoContent */
+        ) {
+          // Use XMLHttpRequest.response if set, responseText otherwise.
+          body = typeof xhr.response === 'undefined' ? xhr.responseText : xhr.response;
+        } // Normalize another potential bug (this one comes from CORS).
+
+
+        if (status === 0) {
+          status = !!body ? 200
+          /* Ok */
+          : 0;
+        } // ok determines whether the response will be transmitted on the event or
+        // error channel. Unsuccessful status codes (not 2xx) will always be errors,
+        // but a successful status code can still result in an error if the user
+        // asked for JSON data and the body cannot be parsed as such.
+
+
+        let ok = status >= 200 && status < 300; // Check whether the body needs to be parsed as JSON (in many cases the browser
+        // will have done that already).
+
+        if (req.responseType === 'json' && typeof body === 'string') {
+          // Save the original body, before attempting XSSI prefix stripping.
+          const originalBody = body;
+          body = body.replace(XSSI_PREFIX, '');
+
+          try {
+            // Attempt the parse. If it fails, a parse error should be delivered to the user.
+            body = body !== '' ? JSON.parse(body) : null;
+          } catch (error) {
+            // Since the JSON.parse failed, it's reasonable to assume this might not have been a
+            // JSON response. Restore the original body (including any XSSI prefix) to deliver
+            // a better error response.
+            body = originalBody; // If this was an error request to begin with, leave it as a string, it probably
+            // just isn't JSON. Otherwise, deliver the parsing error to the user.
+
+            if (ok) {
+              // Even though the response status was 2xx, this is still an error.
+              ok = false; // The parse error contains the text of the body that failed to parse.
+
+              body = {
+                error,
+                text: body
+              };
+            }
+          }
+        }
+
+        if (ok) {
+          // A successful response is delivered on the event stream.
+          observer.next(new HttpResponse({
+            body,
+            headers,
+            status,
+            statusText,
+            url: url || undefined
+          })); // The full body has been received and delivered, no further events
+          // are possible. This request is complete.
+
+          observer.complete();
+        } else {
+          // An unsuccessful request is delivered on the error channel.
+          observer.error(new HttpErrorResponse({
+            // The error in this case is the response body (error from the server).
+            error: body,
+            headers,
+            status,
+            statusText,
+            url: url || undefined
+          }));
+        }
+      }; // The onError callback is called when something goes wrong at the network level.
+      // Connection timeout, DNS error, offline, etc. These are actual errors, and are
+      // transmitted on the error channel.
+
+
+      const onError = error => {
+        const {
+          url
+        } = partialFromXhr();
+        const res = new HttpErrorResponse({
+          error,
+          status: xhr.status || 0,
+          statusText: xhr.statusText || 'Unknown Error',
+          url: url || undefined
+        });
+        observer.error(res);
+      }; // The sentHeaders flag tracks whether the HttpResponseHeaders event
+      // has been sent on the stream. This is necessary to track if progress
+      // is enabled since the event will be sent on only the first download
+      // progerss event.
+
+
+      let sentHeaders = false; // The download progress event handler, which is only registered if
+      // progress events are enabled.
+
+      const onDownProgress = event => {
+        // Send the HttpResponseHeaders event if it hasn't been sent already.
+        if (!sentHeaders) {
+          observer.next(partialFromXhr());
+          sentHeaders = true;
+        } // Start building the download progress event to deliver on the response
+        // event stream.
+
+
+        let progressEvent = {
+          type: HttpEventType.DownloadProgress,
+          loaded: event.loaded
+        }; // Set the total number of bytes in the event if it's available.
+
+        if (event.lengthComputable) {
+          progressEvent.total = event.total;
+        } // If the request was for text content and a partial response is
+        // available on XMLHttpRequest, include it in the progress event
+        // to allow for streaming reads.
+
+
+        if (req.responseType === 'text' && !!xhr.responseText) {
+          progressEvent.partialText = xhr.responseText;
+        } // Finally, fire the event.
+
+
+        observer.next(progressEvent);
+      }; // The upload progress event handler, which is only registered if
+      // progress events are enabled.
+
+
+      const onUpProgress = event => {
+        // Upload progress events are simpler. Begin building the progress
+        // event.
+        let progress = {
+          type: HttpEventType.UploadProgress,
+          loaded: event.loaded
+        }; // If the total number of bytes being uploaded is available, include
+        // it.
+
+        if (event.lengthComputable) {
+          progress.total = event.total;
+        } // Send the event.
+
+
+        observer.next(progress);
+      }; // By default, register for load and error events.
+
+
+      xhr.addEventListener('load', onLoad);
+      xhr.addEventListener('error', onError);
+      xhr.addEventListener('timeout', onError);
+      xhr.addEventListener('abort', onError); // Progress events are only enabled if requested.
+
+      if (req.reportProgress) {
+        // Download progress is always enabled if requested.
+        xhr.addEventListener('progress', onDownProgress); // Upload progress depends on whether there is a body to upload.
+
+        if (reqBody !== null && xhr.upload) {
+          xhr.upload.addEventListener('progress', onUpProgress);
+        }
+      } // Fire the request, and notify the event stream that it was fired.
+
+
+      xhr.send(reqBody);
+      observer.next({
+        type: HttpEventType.Sent
+      }); // This is the return from the Observable function, which is the
+      // request cancellation handler.
+
+      return () => {
+        // On a cancellation, remove all registered event listeners.
+        xhr.removeEventListener('error', onError);
+        xhr.removeEventListener('abort', onError);
+        xhr.removeEventListener('load', onLoad);
+        xhr.removeEventListener('timeout', onError);
+
+        if (req.reportProgress) {
+          xhr.removeEventListener('progress', onDownProgress);
+
+          if (reqBody !== null && xhr.upload) {
+            xhr.upload.removeEventListener('progress', onUpProgress);
+          }
+        } // Finally, abort the in-flight request.
+
+
+        if (xhr.readyState !== xhr.DONE) {
+          xhr.abort();
+        }
+      };
+    });
+  }
+
+}
+
+HttpXhrBackend.ɵfac = function HttpXhrBackend_Factory(t) {
+  return new (t || HttpXhrBackend)(_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_6__.XhrFactory));
+};
+
+HttpXhrBackend.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjectable"]({
+  token: HttpXhrBackend,
+  factory: HttpXhrBackend.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](HttpXhrBackend, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Injectable
+  }], function () {
+    return [{
+      type: _angular_common__WEBPACK_IMPORTED_MODULE_6__.XhrFactory
+    }];
+  }, null);
+})();
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+
+const XSRF_COOKIE_NAME = new _angular_core__WEBPACK_IMPORTED_MODULE_4__.InjectionToken('XSRF_COOKIE_NAME');
+const XSRF_HEADER_NAME = new _angular_core__WEBPACK_IMPORTED_MODULE_4__.InjectionToken('XSRF_HEADER_NAME');
+/**
+ * Retrieves the current XSRF token to use with the next outgoing request.
+ *
+ * @publicApi
+ */
+
+class HttpXsrfTokenExtractor {}
+/**
+ * `HttpXsrfTokenExtractor` which retrieves the token from a cookie.
+ */
+
+
+class HttpXsrfCookieExtractor {
+  constructor(doc, platform, cookieName) {
+    this.doc = doc;
+    this.platform = platform;
+    this.cookieName = cookieName;
+    this.lastCookieString = '';
+    this.lastToken = null;
+    /**
+     * @internal for testing
+     */
+
+    this.parseCount = 0;
+  }
+
+  getToken() {
+    if (this.platform === 'server') {
+      return null;
+    }
+
+    const cookieString = this.doc.cookie || '';
+
+    if (cookieString !== this.lastCookieString) {
+      this.parseCount++;
+      this.lastToken = (0,_angular_common__WEBPACK_IMPORTED_MODULE_6__["ɵparseCookieValue"])(cookieString, this.cookieName);
+      this.lastCookieString = cookieString;
+    }
+
+    return this.lastToken;
+  }
+
+}
+
+HttpXsrfCookieExtractor.ɵfac = function HttpXsrfCookieExtractor_Factory(t) {
+  return new (t || HttpXsrfCookieExtractor)(_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_6__.DOCUMENT), _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_4__.PLATFORM_ID), _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](XSRF_COOKIE_NAME));
+};
+
+HttpXsrfCookieExtractor.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjectable"]({
+  token: HttpXsrfCookieExtractor,
+  factory: HttpXsrfCookieExtractor.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](HttpXsrfCookieExtractor, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Injectable
+  }], function () {
+    return [{
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Inject,
+        args: [_angular_common__WEBPACK_IMPORTED_MODULE_6__.DOCUMENT]
+      }]
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Inject,
+        args: [_angular_core__WEBPACK_IMPORTED_MODULE_4__.PLATFORM_ID]
+      }]
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Inject,
+        args: [XSRF_COOKIE_NAME]
+      }]
+    }];
+  }, null);
+})();
+/**
+ * `HttpInterceptor` which adds an XSRF token to eligible outgoing requests.
+ */
+
+
+class HttpXsrfInterceptor {
+  constructor(tokenService, headerName) {
+    this.tokenService = tokenService;
+    this.headerName = headerName;
+  }
+
+  intercept(req, next) {
+    const lcUrl = req.url.toLowerCase(); // Skip both non-mutating requests and absolute URLs.
+    // Non-mutating requests don't require a token, and absolute URLs require special handling
+    // anyway as the cookie set
+    // on our origin is not the same as the token expected by another origin.
+
+    if (req.method === 'GET' || req.method === 'HEAD' || lcUrl.startsWith('http://') || lcUrl.startsWith('https://')) {
+      return next.handle(req);
+    }
+
+    const token = this.tokenService.getToken(); // Be careful not to overwrite an existing header of the same name.
+
+    if (token !== null && !req.headers.has(this.headerName)) {
+      req = req.clone({
+        headers: req.headers.set(this.headerName, token)
+      });
+    }
+
+    return next.handle(req);
+  }
+
+}
+
+HttpXsrfInterceptor.ɵfac = function HttpXsrfInterceptor_Factory(t) {
+  return new (t || HttpXsrfInterceptor)(_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](HttpXsrfTokenExtractor), _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](XSRF_HEADER_NAME));
+};
+
+HttpXsrfInterceptor.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjectable"]({
+  token: HttpXsrfInterceptor,
+  factory: HttpXsrfInterceptor.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](HttpXsrfInterceptor, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Injectable
+  }], function () {
+    return [{
+      type: HttpXsrfTokenExtractor
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Inject,
+        args: [XSRF_HEADER_NAME]
+      }]
+    }];
+  }, null);
+})();
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * An injectable `HttpHandler` that applies multiple interceptors
+ * to a request before passing it to the given `HttpBackend`.
+ *
+ * The interceptors are loaded lazily from the injector, to allow
+ * interceptors to themselves inject classes depending indirectly
+ * on `HttpInterceptingHandler` itself.
+ * @see `HttpInterceptor`
+ */
+
+
+class HttpInterceptingHandler {
+  constructor(backend, injector) {
+    this.backend = backend;
+    this.injector = injector;
+    this.chain = null;
+  }
+
+  handle(req) {
+    if (this.chain === null) {
+      const interceptors = this.injector.get(HTTP_INTERCEPTORS, []);
+      this.chain = interceptors.reduceRight((next, interceptor) => new HttpInterceptorHandler(next, interceptor), this.backend);
+    }
+
+    return this.chain.handle(req);
+  }
+
+}
+
+HttpInterceptingHandler.ɵfac = function HttpInterceptingHandler_Factory(t) {
+  return new (t || HttpInterceptingHandler)(_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](HttpBackend), _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_4__.Injector));
+};
+
+HttpInterceptingHandler.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjectable"]({
+  token: HttpInterceptingHandler,
+  factory: HttpInterceptingHandler.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](HttpInterceptingHandler, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Injectable
+  }], function () {
+    return [{
+      type: HttpBackend
+    }, {
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.Injector
+    }];
+  }, null);
+})();
+/**
+ * Constructs an `HttpHandler` that applies interceptors
+ * to a request before passing it to the given `HttpBackend`.
+ *
+ * Use as a factory function within `HttpClientModule`.
+ *
+ *
+ */
+
+
+function interceptingHandler(backend, interceptors = []) {
+  if (!interceptors) {
+    return backend;
+  }
+
+  return interceptors.reduceRight((next, interceptor) => new HttpInterceptorHandler(next, interceptor), backend);
+}
+/**
+ * Factory function that determines where to store JSONP callbacks.
+ *
+ * Ordinarily JSONP callbacks are stored on the `window` object, but this may not exist
+ * in test environments. In that case, callbacks are stored on an anonymous object instead.
+ *
+ *
+ */
+
+
+function jsonpCallbackContext() {
+  if (typeof window === 'object') {
+    return window;
+  }
+
+  return {};
+}
+/**
+ * Configures XSRF protection support for outgoing requests.
+ *
+ * For a server that supports a cookie-based XSRF protection system,
+ * use directly to configure XSRF protection with the correct
+ * cookie and header names.
+ *
+ * If no names are supplied, the default cookie name is `XSRF-TOKEN`
+ * and the default header name is `X-XSRF-TOKEN`.
+ *
+ * @publicApi
+ */
+
+
+class HttpClientXsrfModule {
+  /**
+   * Disable the default XSRF protection.
+   */
+  static disable() {
+    return {
+      ngModule: HttpClientXsrfModule,
+      providers: [{
+        provide: HttpXsrfInterceptor,
+        useClass: NoopInterceptor
+      }]
+    };
+  }
+  /**
+   * Configure XSRF protection.
+   * @param options An object that can specify either or both
+   * cookie name or header name.
+   * - Cookie name default is `XSRF-TOKEN`.
+   * - Header name default is `X-XSRF-TOKEN`.
+   *
+   */
+
+
+  static withOptions(options = {}) {
+    return {
+      ngModule: HttpClientXsrfModule,
+      providers: [options.cookieName ? {
+        provide: XSRF_COOKIE_NAME,
+        useValue: options.cookieName
+      } : [], options.headerName ? {
+        provide: XSRF_HEADER_NAME,
+        useValue: options.headerName
+      } : []]
+    };
+  }
+
+}
+
+HttpClientXsrfModule.ɵfac = function HttpClientXsrfModule_Factory(t) {
+  return new (t || HttpClientXsrfModule)();
+};
+
+HttpClientXsrfModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineNgModule"]({
+  type: HttpClientXsrfModule
+});
+HttpClientXsrfModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjector"]({
+  providers: [HttpXsrfInterceptor, {
+    provide: HTTP_INTERCEPTORS,
+    useExisting: HttpXsrfInterceptor,
+    multi: true
+  }, {
+    provide: HttpXsrfTokenExtractor,
+    useClass: HttpXsrfCookieExtractor
+  }, {
+    provide: XSRF_COOKIE_NAME,
+    useValue: 'XSRF-TOKEN'
+  }, {
+    provide: XSRF_HEADER_NAME,
+    useValue: 'X-XSRF-TOKEN'
+  }]
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](HttpClientXsrfModule, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.NgModule,
+    args: [{
+      providers: [HttpXsrfInterceptor, {
+        provide: HTTP_INTERCEPTORS,
+        useExisting: HttpXsrfInterceptor,
+        multi: true
+      }, {
+        provide: HttpXsrfTokenExtractor,
+        useClass: HttpXsrfCookieExtractor
+      }, {
+        provide: XSRF_COOKIE_NAME,
+        useValue: 'XSRF-TOKEN'
+      }, {
+        provide: XSRF_HEADER_NAME,
+        useValue: 'X-XSRF-TOKEN'
+      }]
+    }]
+  }], null, null);
+})();
+/**
+ * Configures the [dependency injector](guide/glossary#injector) for `HttpClient`
+ * with supporting services for XSRF. Automatically imported by `HttpClientModule`.
+ *
+ * You can add interceptors to the chain behind `HttpClient` by binding them to the
+ * multiprovider for built-in [DI token](guide/glossary#di-token) `HTTP_INTERCEPTORS`.
+ *
+ * @publicApi
+ */
+
+
+class HttpClientModule {}
+
+HttpClientModule.ɵfac = function HttpClientModule_Factory(t) {
+  return new (t || HttpClientModule)();
+};
+
+HttpClientModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineNgModule"]({
+  type: HttpClientModule,
+  imports: [HttpClientXsrfModule]
+});
+HttpClientModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjector"]({
+  providers: [HttpClient, {
+    provide: HttpHandler,
+    useClass: HttpInterceptingHandler
+  }, HttpXhrBackend, {
+    provide: HttpBackend,
+    useExisting: HttpXhrBackend
+  }],
+  imports: [[HttpClientXsrfModule.withOptions({
+    cookieName: 'XSRF-TOKEN',
+    headerName: 'X-XSRF-TOKEN'
+  })]]
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](HttpClientModule, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.NgModule,
+    args: [{
+      /**
+       * Optional configuration for XSRF protection.
+       */
+      imports: [HttpClientXsrfModule.withOptions({
+        cookieName: 'XSRF-TOKEN',
+        headerName: 'X-XSRF-TOKEN'
+      })],
+
+      /**
+       * Configures the [dependency injector](guide/glossary#injector) where it is imported
+       * with supporting services for HTTP communications.
+       */
+      providers: [HttpClient, {
+        provide: HttpHandler,
+        useClass: HttpInterceptingHandler
+      }, HttpXhrBackend, {
+        provide: HttpBackend,
+        useExisting: HttpXhrBackend
+      }]
+    }]
+  }], null, null);
+})();
+/**
+ * Configures the [dependency injector](guide/glossary#injector) for `HttpClient`
+ * with supporting services for JSONP.
+ * Without this module, Jsonp requests reach the backend
+ * with method JSONP, where they are rejected.
+ *
+ * You can add interceptors to the chain behind `HttpClient` by binding them to the
+ * multiprovider for built-in [DI token](guide/glossary#di-token) `HTTP_INTERCEPTORS`.
+ *
+ * @publicApi
+ */
+
+
+class HttpClientJsonpModule {}
+
+HttpClientJsonpModule.ɵfac = function HttpClientJsonpModule_Factory(t) {
+  return new (t || HttpClientJsonpModule)();
+};
+
+HttpClientJsonpModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineNgModule"]({
+  type: HttpClientJsonpModule
+});
+HttpClientJsonpModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjector"]({
+  providers: [JsonpClientBackend, {
+    provide: JsonpCallbackContext,
+    useFactory: jsonpCallbackContext
+  }, {
+    provide: HTTP_INTERCEPTORS,
+    useClass: JsonpInterceptor,
+    multi: true
+  }]
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](HttpClientJsonpModule, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.NgModule,
+    args: [{
+      providers: [JsonpClientBackend, {
+        provide: JsonpCallbackContext,
+        useFactory: jsonpCallbackContext
+      }, {
+        provide: HTTP_INTERCEPTORS,
+        useClass: JsonpInterceptor,
+        multi: true
+      }]
+    }]
+  }], null, null);
+})();
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * A wrapper around the `XMLHttpRequest` constructor.
+ *
+ * @publicApi
+ * @see `XhrFactory`
+ * @deprecated
+ * `XhrFactory` has moved, please import `XhrFactory` from `@angular/common` instead.
+ */
+
+
+const XhrFactory = _angular_common__WEBPACK_IMPORTED_MODULE_6__.XhrFactory;
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * Generated bundle index. Do not edit.
+ */
 
 
 
@@ -99325,6 +103177,3135 @@ const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.2.7')
 /**
  * Generated bundle index. Do not edit.
  */
+
+
+
+/***/ }),
+
+/***/ 5811:
+/*!****************************************************************************!*\
+  !*** ./node_modules/@ngrx/store-devtools/fesm2015/ngrx-store-devtools.mjs ***!
+  \****************************************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "INITIAL_OPTIONS": () => (/* binding */ INITIAL_OPTIONS),
+/* harmony export */   "RECOMPUTE": () => (/* binding */ RECOMPUTE),
+/* harmony export */   "REDUX_DEVTOOLS_EXTENSION": () => (/* binding */ REDUX_DEVTOOLS_EXTENSION),
+/* harmony export */   "StoreDevtools": () => (/* binding */ StoreDevtools),
+/* harmony export */   "StoreDevtoolsConfig": () => (/* binding */ StoreDevtoolsConfig),
+/* harmony export */   "StoreDevtoolsModule": () => (/* binding */ StoreDevtoolsModule)
+/* harmony export */ });
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ 3184);
+/* harmony import */ var _ngrx_store__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @ngrx/store */ 5585);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! rxjs */ 6439);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs */ 2378);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! rxjs */ 4139);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! rxjs */ 8623);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! rxjs */ 8198);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! rxjs */ 1555);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs/operators */ 4514);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! rxjs/operators */ 9151);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! rxjs/operators */ 6942);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! rxjs/operators */ 1133);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! rxjs/operators */ 9019);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! rxjs/operators */ 823);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! rxjs/operators */ 7418);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! rxjs/operators */ 3910);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! rxjs/operators */ 5921);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! rxjs/operators */ 9095);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! rxjs/operators */ 6276);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! rxjs/operators */ 3888);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! rxjs/operators */ 1745);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! rxjs/operators */ 2647);
+
+
+
+
+
+
+/**
+ * Chrome extension documentation
+ * @see https://github.com/reduxjs/redux-devtools/blob/main/extension/docs/API/Arguments.md
+ * Firefox extension documentation
+ * @see https://github.com/zalmoxisus/redux-devtools-extension/blob/master/docs/API/Arguments.md
+ */
+
+class StoreDevtoolsConfig {
+  constructor() {
+    /**
+     * Maximum allowed actions to be stored in the history tree (default: `false`)
+     */
+    this.maxAge = false;
+  }
+
+}
+
+const STORE_DEVTOOLS_CONFIG = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.InjectionToken('@ngrx/store-devtools Options');
+/**
+ * Used to provide a `StoreDevtoolsConfig` for the store-devtools.
+ */
+
+const INITIAL_OPTIONS = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.InjectionToken('@ngrx/store-devtools Initial Config');
+
+function noMonitor() {
+  return null;
+}
+
+const DEFAULT_NAME = 'NgRx Store DevTools';
+
+function createConfig(optionsInput) {
+  const DEFAULT_OPTIONS = {
+    maxAge: false,
+    monitor: noMonitor,
+    actionSanitizer: undefined,
+    stateSanitizer: undefined,
+    name: DEFAULT_NAME,
+    serialize: false,
+    logOnly: false,
+    autoPause: false,
+    // Add all features explicitly. This prevent buggy behavior for
+    // options like "lock" which might otherwise not show up.
+    features: {
+      pause: true,
+      lock: true,
+      persist: true,
+      export: true,
+      import: 'custom',
+      jump: true,
+      skip: true,
+      reorder: true,
+      dispatch: true,
+      test: true // Generate tests for the selected actions
+
+    }
+  };
+  const options = typeof optionsInput === 'function' ? optionsInput() : optionsInput;
+  const logOnly = options.logOnly ? {
+    pause: true,
+    export: true,
+    test: true
+  } : false;
+  const features = options.features || logOnly || DEFAULT_OPTIONS.features;
+  const config = Object.assign({}, DEFAULT_OPTIONS, {
+    features
+  }, options);
+
+  if (config.maxAge && config.maxAge < 2) {
+    throw new Error(`Devtools 'maxAge' cannot be less than 2, got ${config.maxAge}`);
+  }
+
+  return config;
+}
+
+const PERFORM_ACTION = 'PERFORM_ACTION';
+const REFRESH = 'REFRESH';
+const RESET = 'RESET';
+const ROLLBACK = 'ROLLBACK';
+const COMMIT = 'COMMIT';
+const SWEEP = 'SWEEP';
+const TOGGLE_ACTION = 'TOGGLE_ACTION';
+const SET_ACTIONS_ACTIVE = 'SET_ACTIONS_ACTIVE';
+const JUMP_TO_STATE = 'JUMP_TO_STATE';
+const JUMP_TO_ACTION = 'JUMP_TO_ACTION';
+const IMPORT_STATE = 'IMPORT_STATE';
+const LOCK_CHANGES = 'LOCK_CHANGES';
+const PAUSE_RECORDING = 'PAUSE_RECORDING';
+
+class PerformAction {
+  constructor(action, timestamp) {
+    this.action = action;
+    this.timestamp = timestamp;
+    this.type = PERFORM_ACTION;
+
+    if (typeof action.type === 'undefined') {
+      throw new Error('Actions may not have an undefined "type" property. ' + 'Have you misspelled a constant?');
+    }
+  }
+
+}
+
+class Refresh {
+  constructor() {
+    this.type = REFRESH;
+  }
+
+}
+
+class Reset {
+  constructor(timestamp) {
+    this.timestamp = timestamp;
+    this.type = RESET;
+  }
+
+}
+
+class Rollback {
+  constructor(timestamp) {
+    this.timestamp = timestamp;
+    this.type = ROLLBACK;
+  }
+
+}
+
+class Commit {
+  constructor(timestamp) {
+    this.timestamp = timestamp;
+    this.type = COMMIT;
+  }
+
+}
+
+class Sweep {
+  constructor() {
+    this.type = SWEEP;
+  }
+
+}
+
+class ToggleAction {
+  constructor(id) {
+    this.id = id;
+    this.type = TOGGLE_ACTION;
+  }
+
+}
+
+class SetActionsActive {
+  constructor(start, end, active = true) {
+    this.start = start;
+    this.end = end;
+    this.active = active;
+    this.type = SET_ACTIONS_ACTIVE;
+  }
+
+}
+
+class JumpToState {
+  constructor(index) {
+    this.index = index;
+    this.type = JUMP_TO_STATE;
+  }
+
+}
+
+class JumpToAction {
+  constructor(actionId) {
+    this.actionId = actionId;
+    this.type = JUMP_TO_ACTION;
+  }
+
+}
+
+class ImportState {
+  constructor(nextLiftedState) {
+    this.nextLiftedState = nextLiftedState;
+    this.type = IMPORT_STATE;
+  }
+
+}
+
+class LockChanges {
+  constructor(status) {
+    this.status = status;
+    this.type = LOCK_CHANGES;
+  }
+
+}
+
+class PauseRecording {
+  constructor(status) {
+    this.status = status;
+    this.type = PAUSE_RECORDING;
+  }
+
+}
+
+function difference(first, second) {
+  return first.filter(item => second.indexOf(item) < 0);
+}
+/**
+ * Provides an app's view into the state of the lifted store.
+ */
+
+
+function unliftState(liftedState) {
+  const {
+    computedStates,
+    currentStateIndex
+  } = liftedState; // At start up NgRx dispatches init actions,
+  // When these init actions are being filtered out by the predicate or safe/block list options
+  // we don't have a complete computed states yet.
+  // At this point it could happen that we're out of bounds, when this happens we fall back to the last known state
+
+  if (currentStateIndex >= computedStates.length) {
+    const {
+      state
+    } = computedStates[computedStates.length - 1];
+    return state;
+  }
+
+  const {
+    state
+  } = computedStates[currentStateIndex];
+  return state;
+}
+
+function unliftAction(liftedState) {
+  return liftedState.actionsById[liftedState.nextActionId - 1];
+}
+/**
+ * Lifts an app's action into an action on the lifted store.
+ */
+
+
+function liftAction(action) {
+  return new PerformAction(action, +Date.now());
+}
+/**
+ * Sanitizes given actions with given function.
+ */
+
+
+function sanitizeActions(actionSanitizer, actions) {
+  return Object.keys(actions).reduce((sanitizedActions, actionIdx) => {
+    const idx = Number(actionIdx);
+    sanitizedActions[idx] = sanitizeAction(actionSanitizer, actions[idx], idx);
+    return sanitizedActions;
+  }, {});
+}
+/**
+ * Sanitizes given action with given function.
+ */
+
+
+function sanitizeAction(actionSanitizer, action, actionIdx) {
+  return Object.assign(Object.assign({}, action), {
+    action: actionSanitizer(action.action, actionIdx)
+  });
+}
+/**
+ * Sanitizes given states with given function.
+ */
+
+
+function sanitizeStates(stateSanitizer, states) {
+  return states.map((computedState, idx) => ({
+    state: sanitizeState(stateSanitizer, computedState.state, idx),
+    error: computedState.error
+  }));
+}
+/**
+ * Sanitizes given state with given function.
+ */
+
+
+function sanitizeState(stateSanitizer, state, stateIdx) {
+  return stateSanitizer(state, stateIdx);
+}
+/**
+ * Read the config and tell if actions should be filtered
+ */
+
+
+function shouldFilterActions(config) {
+  return config.predicate || config.actionsSafelist || config.actionsBlocklist;
+}
+/**
+ * Return a full filtered lifted state
+ */
+
+
+function filterLiftedState(liftedState, predicate, safelist, blocklist) {
+  const filteredStagedActionIds = [];
+  const filteredActionsById = {};
+  const filteredComputedStates = [];
+  liftedState.stagedActionIds.forEach((id, idx) => {
+    const liftedAction = liftedState.actionsById[id];
+    if (!liftedAction) return;
+
+    if (idx && isActionFiltered(liftedState.computedStates[idx], liftedAction, predicate, safelist, blocklist)) {
+      return;
+    }
+
+    filteredActionsById[id] = liftedAction;
+    filteredStagedActionIds.push(id);
+    filteredComputedStates.push(liftedState.computedStates[idx]);
+  });
+  return Object.assign(Object.assign({}, liftedState), {
+    stagedActionIds: filteredStagedActionIds,
+    actionsById: filteredActionsById,
+    computedStates: filteredComputedStates
+  });
+}
+/**
+ * Return true is the action should be ignored
+ */
+
+
+function isActionFiltered(state, action, predicate, safelist, blockedlist) {
+  const predicateMatch = predicate && !predicate(state, action.action);
+  const safelistMatch = safelist && !action.action.type.match(safelist.map(s => escapeRegExp(s)).join('|'));
+  const blocklistMatch = blockedlist && action.action.type.match(blockedlist.map(s => escapeRegExp(s)).join('|'));
+  return predicateMatch || safelistMatch || blocklistMatch;
+}
+/**
+ * Return string with escaped RegExp special characters
+ * https://stackoverflow.com/a/6969486/1337347
+ */
+
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const INIT_ACTION = {
+  type: _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.INIT
+};
+const RECOMPUTE = '@ngrx/store-devtools/recompute';
+const RECOMPUTE_ACTION = {
+  type: RECOMPUTE
+};
+/**
+ * Computes the next entry in the log by applying an action.
+ */
+
+function computeNextEntry(reducer, action, state, error, errorHandler) {
+  if (error) {
+    return {
+      state,
+      error: 'Interrupted by an error up the chain'
+    };
+  }
+
+  let nextState = state;
+  let nextError;
+
+  try {
+    nextState = reducer(state, action);
+  } catch (err) {
+    nextError = err.toString();
+    errorHandler.handleError(err);
+  }
+
+  return {
+    state: nextState,
+    error: nextError
+  };
+}
+/**
+ * Runs the reducer on invalidated actions to get a fresh computation log.
+ */
+
+
+function recomputeStates(computedStates, minInvalidatedStateIndex, reducer, committedState, actionsById, stagedActionIds, skippedActionIds, errorHandler, isPaused) {
+  // Optimization: exit early and return the same reference
+  // if we know nothing could have changed.
+  if (minInvalidatedStateIndex >= computedStates.length && computedStates.length === stagedActionIds.length) {
+    return computedStates;
+  }
+
+  const nextComputedStates = computedStates.slice(0, minInvalidatedStateIndex); // If the recording is paused, recompute all states up until the pause state,
+  // else recompute all states.
+
+  const lastIncludedActionId = stagedActionIds.length - (isPaused ? 1 : 0);
+
+  for (let i = minInvalidatedStateIndex; i < lastIncludedActionId; i++) {
+    const actionId = stagedActionIds[i];
+    const action = actionsById[actionId].action;
+    const previousEntry = nextComputedStates[i - 1];
+    const previousState = previousEntry ? previousEntry.state : committedState;
+    const previousError = previousEntry ? previousEntry.error : undefined;
+    const shouldSkip = skippedActionIds.indexOf(actionId) > -1;
+    const entry = shouldSkip ? previousEntry : computeNextEntry(reducer, action, previousState, previousError, errorHandler);
+    nextComputedStates.push(entry);
+  } // If the recording is paused, the last state will not be recomputed,
+  // because it's essentially not part of the state history.
+
+
+  if (isPaused) {
+    nextComputedStates.push(computedStates[computedStates.length - 1]);
+  }
+
+  return nextComputedStates;
+}
+
+function liftInitialState(initialCommittedState, monitorReducer) {
+  return {
+    monitorState: monitorReducer(undefined, {}),
+    nextActionId: 1,
+    actionsById: {
+      0: liftAction(INIT_ACTION)
+    },
+    stagedActionIds: [0],
+    skippedActionIds: [],
+    committedState: initialCommittedState,
+    currentStateIndex: 0,
+    computedStates: [],
+    isLocked: false,
+    isPaused: false
+  };
+}
+/**
+ * Creates a history state reducer from an app's reducer.
+ */
+
+
+function liftReducerWith(initialCommittedState, initialLiftedState, errorHandler, monitorReducer, options = {}) {
+  /**
+   * Manages how the history actions modify the history state.
+   */
+  return reducer => (liftedState, liftedAction) => {
+    let {
+      monitorState,
+      actionsById,
+      nextActionId,
+      stagedActionIds,
+      skippedActionIds,
+      committedState,
+      currentStateIndex,
+      computedStates,
+      isLocked,
+      isPaused
+    } = liftedState || initialLiftedState;
+
+    if (!liftedState) {
+      // Prevent mutating initialLiftedState
+      actionsById = Object.create(actionsById);
+    }
+
+    function commitExcessActions(n) {
+      // Auto-commits n-number of excess actions.
+      let excess = n;
+      let idsToDelete = stagedActionIds.slice(1, excess + 1);
+
+      for (let i = 0; i < idsToDelete.length; i++) {
+        if (computedStates[i + 1].error) {
+          // Stop if error is found. Commit actions up to error.
+          excess = i;
+          idsToDelete = stagedActionIds.slice(1, excess + 1);
+          break;
+        } else {
+          delete actionsById[idsToDelete[i]];
+        }
+      }
+
+      skippedActionIds = skippedActionIds.filter(id => idsToDelete.indexOf(id) === -1);
+      stagedActionIds = [0, ...stagedActionIds.slice(excess + 1)];
+      committedState = computedStates[excess].state;
+      computedStates = computedStates.slice(excess);
+      currentStateIndex = currentStateIndex > excess ? currentStateIndex - excess : 0;
+    }
+
+    function commitChanges() {
+      // Consider the last committed state the new starting point.
+      // Squash any staged actions into a single committed state.
+      actionsById = {
+        0: liftAction(INIT_ACTION)
+      };
+      nextActionId = 1;
+      stagedActionIds = [0];
+      skippedActionIds = [];
+      committedState = computedStates[currentStateIndex].state;
+      currentStateIndex = 0;
+      computedStates = [];
+    } // By default, aggressively recompute every state whatever happens.
+    // This has O(n) performance, so we'll override this to a sensible
+    // value whenever we feel like we don't have to recompute the states.
+
+
+    let minInvalidatedStateIndex = 0;
+
+    switch (liftedAction.type) {
+      case LOCK_CHANGES:
+        {
+          isLocked = liftedAction.status;
+          minInvalidatedStateIndex = Infinity;
+          break;
+        }
+
+      case PAUSE_RECORDING:
+        {
+          isPaused = liftedAction.status;
+
+          if (isPaused) {
+            // Add a pause action to signal the devtools-user the recording is paused.
+            // The corresponding state will be overwritten on each update to always contain
+            // the latest state (see Actions.PERFORM_ACTION).
+            stagedActionIds = [...stagedActionIds, nextActionId];
+            actionsById[nextActionId] = new PerformAction({
+              type: '@ngrx/devtools/pause'
+            }, +Date.now());
+            nextActionId++;
+            minInvalidatedStateIndex = stagedActionIds.length - 1;
+            computedStates = computedStates.concat(computedStates[computedStates.length - 1]);
+
+            if (currentStateIndex === stagedActionIds.length - 2) {
+              currentStateIndex++;
+            }
+
+            minInvalidatedStateIndex = Infinity;
+          } else {
+            commitChanges();
+          }
+
+          break;
+        }
+
+      case RESET:
+        {
+          // Get back to the state the store was created with.
+          actionsById = {
+            0: liftAction(INIT_ACTION)
+          };
+          nextActionId = 1;
+          stagedActionIds = [0];
+          skippedActionIds = [];
+          committedState = initialCommittedState;
+          currentStateIndex = 0;
+          computedStates = [];
+          break;
+        }
+
+      case COMMIT:
+        {
+          commitChanges();
+          break;
+        }
+
+      case ROLLBACK:
+        {
+          // Forget about any staged actions.
+          // Start again from the last committed state.
+          actionsById = {
+            0: liftAction(INIT_ACTION)
+          };
+          nextActionId = 1;
+          stagedActionIds = [0];
+          skippedActionIds = [];
+          currentStateIndex = 0;
+          computedStates = [];
+          break;
+        }
+
+      case TOGGLE_ACTION:
+        {
+          // Toggle whether an action with given ID is skipped.
+          // Being skipped means it is a no-op during the computation.
+          const {
+            id: actionId
+          } = liftedAction;
+          const index = skippedActionIds.indexOf(actionId);
+
+          if (index === -1) {
+            skippedActionIds = [actionId, ...skippedActionIds];
+          } else {
+            skippedActionIds = skippedActionIds.filter(id => id !== actionId);
+          } // Optimization: we know history before this action hasn't changed
+
+
+          minInvalidatedStateIndex = stagedActionIds.indexOf(actionId);
+          break;
+        }
+
+      case SET_ACTIONS_ACTIVE:
+        {
+          // Toggle whether an action with given ID is skipped.
+          // Being skipped means it is a no-op during the computation.
+          const {
+            start,
+            end,
+            active
+          } = liftedAction;
+          const actionIds = [];
+
+          for (let i = start; i < end; i++) actionIds.push(i);
+
+          if (active) {
+            skippedActionIds = difference(skippedActionIds, actionIds);
+          } else {
+            skippedActionIds = [...skippedActionIds, ...actionIds];
+          } // Optimization: we know history before this action hasn't changed
+
+
+          minInvalidatedStateIndex = stagedActionIds.indexOf(start);
+          break;
+        }
+
+      case JUMP_TO_STATE:
+        {
+          // Without recomputing anything, move the pointer that tell us
+          // which state is considered the current one. Useful for sliders.
+          currentStateIndex = liftedAction.index; // Optimization: we know the history has not changed.
+
+          minInvalidatedStateIndex = Infinity;
+          break;
+        }
+
+      case JUMP_TO_ACTION:
+        {
+          // Jumps to a corresponding state to a specific action.
+          // Useful when filtering actions.
+          const index = stagedActionIds.indexOf(liftedAction.actionId);
+          if (index !== -1) currentStateIndex = index;
+          minInvalidatedStateIndex = Infinity;
+          break;
+        }
+
+      case SWEEP:
+        {
+          // Forget any actions that are currently being skipped.
+          stagedActionIds = difference(stagedActionIds, skippedActionIds);
+          skippedActionIds = [];
+          currentStateIndex = Math.min(currentStateIndex, stagedActionIds.length - 1);
+          break;
+        }
+
+      case PERFORM_ACTION:
+        {
+          // Ignore action and return state as is if recording is locked
+          if (isLocked) {
+            return liftedState || initialLiftedState;
+          }
+
+          if (isPaused || liftedState && isActionFiltered(liftedState.computedStates[currentStateIndex], liftedAction, options.predicate, options.actionsSafelist, options.actionsBlocklist)) {
+            // If recording is paused or if the action should be ignored, overwrite the last state
+            // (corresponds to the pause action) and keep everything else as is.
+            // This way, the app gets the new current state while the devtools
+            // do not record another action.
+            const lastState = computedStates[computedStates.length - 1];
+            computedStates = [...computedStates.slice(0, -1), computeNextEntry(reducer, liftedAction.action, lastState.state, lastState.error, errorHandler)];
+            minInvalidatedStateIndex = Infinity;
+            break;
+          } // Auto-commit as new actions come in.
+
+
+          if (options.maxAge && stagedActionIds.length === options.maxAge) {
+            commitExcessActions(1);
+          }
+
+          if (currentStateIndex === stagedActionIds.length - 1) {
+            currentStateIndex++;
+          }
+
+          const actionId = nextActionId++; // Mutation! This is the hottest path, and we optimize on purpose.
+          // It is safe because we set a new key in a cache dictionary.
+
+          actionsById[actionId] = liftedAction;
+          stagedActionIds = [...stagedActionIds, actionId]; // Optimization: we know that only the new action needs computing.
+
+          minInvalidatedStateIndex = stagedActionIds.length - 1;
+          break;
+        }
+
+      case IMPORT_STATE:
+        {
+          // Completely replace everything.
+          ({
+            monitorState,
+            actionsById,
+            nextActionId,
+            stagedActionIds,
+            skippedActionIds,
+            committedState,
+            currentStateIndex,
+            computedStates,
+            isLocked,
+            isPaused
+          } = liftedAction.nextLiftedState);
+          break;
+        }
+
+      case _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.INIT:
+        {
+          // Always recompute states on hot reload and init.
+          minInvalidatedStateIndex = 0;
+
+          if (options.maxAge && stagedActionIds.length > options.maxAge) {
+            // States must be recomputed before committing excess.
+            computedStates = recomputeStates(computedStates, minInvalidatedStateIndex, reducer, committedState, actionsById, stagedActionIds, skippedActionIds, errorHandler, isPaused);
+            commitExcessActions(stagedActionIds.length - options.maxAge); // Avoid double computation.
+
+            minInvalidatedStateIndex = Infinity;
+          }
+
+          break;
+        }
+
+      case _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.UPDATE:
+        {
+          const stateHasErrors = computedStates.filter(state => state.error).length > 0;
+
+          if (stateHasErrors) {
+            // Recompute all states
+            minInvalidatedStateIndex = 0;
+
+            if (options.maxAge && stagedActionIds.length > options.maxAge) {
+              // States must be recomputed before committing excess.
+              computedStates = recomputeStates(computedStates, minInvalidatedStateIndex, reducer, committedState, actionsById, stagedActionIds, skippedActionIds, errorHandler, isPaused);
+              commitExcessActions(stagedActionIds.length - options.maxAge); // Avoid double computation.
+
+              minInvalidatedStateIndex = Infinity;
+            }
+          } else {
+            // If not paused/locked, add a new action to signal devtools-user
+            // that there was a reducer update.
+            if (!isPaused && !isLocked) {
+              if (currentStateIndex === stagedActionIds.length - 1) {
+                currentStateIndex++;
+              } // Add a new action to only recompute state
+
+
+              const actionId = nextActionId++;
+              actionsById[actionId] = new PerformAction(liftedAction, +Date.now());
+              stagedActionIds = [...stagedActionIds, actionId];
+              minInvalidatedStateIndex = stagedActionIds.length - 1;
+              computedStates = recomputeStates(computedStates, minInvalidatedStateIndex, reducer, committedState, actionsById, stagedActionIds, skippedActionIds, errorHandler, isPaused);
+            } // Recompute state history with latest reducer and update action
+
+
+            computedStates = computedStates.map(cmp => Object.assign(Object.assign({}, cmp), {
+              state: reducer(cmp.state, RECOMPUTE_ACTION)
+            }));
+            currentStateIndex = stagedActionIds.length - 1;
+
+            if (options.maxAge && stagedActionIds.length > options.maxAge) {
+              commitExcessActions(stagedActionIds.length - options.maxAge);
+            } // Avoid double computation.
+
+
+            minInvalidatedStateIndex = Infinity;
+          }
+
+          break;
+        }
+
+      default:
+        {
+          // If the action is not recognized, it's a monitor action.
+          // Optimization: a monitor action can't change history.
+          minInvalidatedStateIndex = Infinity;
+          break;
+        }
+    }
+
+    computedStates = recomputeStates(computedStates, minInvalidatedStateIndex, reducer, committedState, actionsById, stagedActionIds, skippedActionIds, errorHandler, isPaused);
+    monitorState = monitorReducer(monitorState, liftedAction);
+    return {
+      monitorState,
+      actionsById,
+      nextActionId,
+      stagedActionIds,
+      skippedActionIds,
+      committedState,
+      currentStateIndex,
+      computedStates,
+      isLocked,
+      isPaused
+    };
+  };
+}
+
+class DevtoolsDispatcher extends _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.ActionsSubject {}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+DevtoolsDispatcher.ɵfac = /* @__PURE__ */function () {
+  let ɵDevtoolsDispatcher_BaseFactory;
+  return function DevtoolsDispatcher_Factory(t) {
+    return (ɵDevtoolsDispatcher_BaseFactory || (ɵDevtoolsDispatcher_BaseFactory = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵgetInheritedFactory"](DevtoolsDispatcher)))(t || DevtoolsDispatcher);
+  };
+}();
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+DevtoolsDispatcher.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjectable"]({
+  token: DevtoolsDispatcher,
+  factory: DevtoolsDispatcher.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](DevtoolsDispatcher, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Injectable
+  }], null, null);
+})();
+
+const ExtensionActionTypes = {
+  START: 'START',
+  DISPATCH: 'DISPATCH',
+  STOP: 'STOP',
+  ACTION: 'ACTION'
+};
+const REDUX_DEVTOOLS_EXTENSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.InjectionToken('@ngrx/store-devtools Redux Devtools Extension');
+
+class DevtoolsExtension {
+  constructor(devtoolsExtension, config, dispatcher) {
+    this.config = config;
+    this.dispatcher = dispatcher;
+    this.devtoolsExtension = devtoolsExtension;
+    this.createActionStreams();
+  }
+
+  notify(action, state) {
+    if (!this.devtoolsExtension) {
+      return;
+    } // Check to see if the action requires a full update of the liftedState.
+    // If it is a simple action generated by the user's app and the recording
+    // is not locked/paused, only send the action and the current state (fast).
+    //
+    // A full liftedState update (slow: serializes the entire liftedState) is
+    // only required when:
+    //   a) redux-devtools-extension fires the @@Init action (ignored by
+    //      @ngrx/store-devtools)
+    //   b) an action is generated by an @ngrx module (e.g. @ngrx/effects/init
+    //      or @ngrx/store/update-reducers)
+    //   c) the state has been recomputed due to time-traveling
+    //   d) any action that is not a PerformAction to err on the side of
+    //      caution.
+
+
+    if (action.type === PERFORM_ACTION) {
+      if (state.isLocked || state.isPaused) {
+        return;
+      }
+
+      const currentState = unliftState(state);
+
+      if (shouldFilterActions(this.config) && isActionFiltered(currentState, action, this.config.predicate, this.config.actionsSafelist, this.config.actionsBlocklist)) {
+        return;
+      }
+
+      const sanitizedState = this.config.stateSanitizer ? sanitizeState(this.config.stateSanitizer, currentState, state.currentStateIndex) : currentState;
+      const sanitizedAction = this.config.actionSanitizer ? sanitizeAction(this.config.actionSanitizer, action, state.nextActionId) : action;
+      this.sendToReduxDevtools(() => this.extensionConnection.send(sanitizedAction, sanitizedState));
+    } else {
+      // Requires full state update
+      const sanitizedLiftedState = Object.assign(Object.assign({}, state), {
+        stagedActionIds: state.stagedActionIds,
+        actionsById: this.config.actionSanitizer ? sanitizeActions(this.config.actionSanitizer, state.actionsById) : state.actionsById,
+        computedStates: this.config.stateSanitizer ? sanitizeStates(this.config.stateSanitizer, state.computedStates) : state.computedStates
+      });
+      this.sendToReduxDevtools(() => this.devtoolsExtension.send(null, sanitizedLiftedState, this.getExtensionConfig(this.config)));
+    }
+  }
+
+  createChangesObservable() {
+    if (!this.devtoolsExtension) {
+      return rxjs__WEBPACK_IMPORTED_MODULE_2__.EMPTY;
+    }
+
+    return new rxjs__WEBPACK_IMPORTED_MODULE_3__.Observable(subscriber => {
+      const connection = this.devtoolsExtension.connect(this.getExtensionConfig(this.config));
+      this.extensionConnection = connection;
+      connection.init();
+      connection.subscribe(change => subscriber.next(change));
+      return connection.unsubscribe;
+    });
+  }
+
+  createActionStreams() {
+    // Listens to all changes
+    const changes$ = this.createChangesObservable().pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.share)()); // Listen for the start action
+
+    const start$ = changes$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_5__.filter)(change => change.type === ExtensionActionTypes.START)); // Listen for the stop action
+
+    const stop$ = changes$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_5__.filter)(change => change.type === ExtensionActionTypes.STOP)); // Listen for lifted actions
+
+    const liftedActions$ = changes$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_5__.filter)(change => change.type === ExtensionActionTypes.DISPATCH), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.map)(change => this.unwrapAction(change.payload)), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_7__.concatMap)(action => {
+      if (action.type === IMPORT_STATE) {
+        // State imports may happen in two situations:
+        // 1. Explicitly by user
+        // 2. User activated the "persist state accross reloads" option
+        //    and now the state is imported during reload.
+        // Because of option 2, we need to give possible
+        // lazy loaded reducers time to instantiate.
+        // As soon as there is no UPDATE action within 1 second,
+        // it is assumed that all reducers are loaded.
+        return this.dispatcher.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_5__.filter)(action => action.type === _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.UPDATE), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_8__.timeout)(1000), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_9__.debounceTime)(1000), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.map)(() => action), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_10__.catchError)(() => (0,rxjs__WEBPACK_IMPORTED_MODULE_11__.of)(action)), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_12__.take)(1));
+      } else {
+        return (0,rxjs__WEBPACK_IMPORTED_MODULE_11__.of)(action);
+      }
+    })); // Listen for unlifted actions
+
+    const actions$ = changes$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_5__.filter)(change => change.type === ExtensionActionTypes.ACTION), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.map)(change => this.unwrapAction(change.payload)));
+    const actionsUntilStop$ = actions$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_13__.takeUntil)(stop$));
+    const liftedUntilStop$ = liftedActions$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_13__.takeUntil)(stop$));
+    this.start$ = start$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_13__.takeUntil)(stop$)); // Only take the action sources between the start/stop events
+
+    this.actions$ = this.start$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_14__.switchMap)(() => actionsUntilStop$));
+    this.liftedActions$ = this.start$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_14__.switchMap)(() => liftedUntilStop$));
+  }
+
+  unwrapAction(action) {
+    return typeof action === 'string' ? eval(`(${action})`) : action;
+  }
+
+  getExtensionConfig(config) {
+    var _a;
+
+    const extensionOptions = {
+      name: config.name,
+      features: config.features,
+      serialize: config.serialize,
+      autoPause: (_a = config.autoPause) !== null && _a !== void 0 ? _a : false // The action/state sanitizers are not added to the config
+      // because sanitation is done in this class already.
+      // It is done before sending it to the devtools extension for consistency:
+      // - If we call extensionConnection.send(...),
+      //   the extension would call the sanitizers.
+      // - If we call devtoolsExtension.send(...) (aka full state update),
+      //   the extension would NOT call the sanitizers, so we have to do it ourselves.
+
+    };
+
+    if (config.maxAge !== false
+    /* support === 0 */
+    ) {
+      extensionOptions.maxAge = config.maxAge;
+    }
+
+    return extensionOptions;
+  }
+
+  sendToReduxDevtools(send) {
+    try {
+      send();
+    } catch (err) {
+      console.warn('@ngrx/store-devtools: something went wrong inside the redux devtools', err);
+    }
+  }
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+DevtoolsExtension.ɵfac = function DevtoolsExtension_Factory(t) {
+  return new (t || DevtoolsExtension)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](REDUX_DEVTOOLS_EXTENSION), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](STORE_DEVTOOLS_CONFIG), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](DevtoolsDispatcher));
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+DevtoolsExtension.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjectable"]({
+  token: DevtoolsExtension,
+  factory: DevtoolsExtension.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](DevtoolsExtension, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Injectable
+  }], function () {
+    return [{
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
+        args: [REDUX_DEVTOOLS_EXTENSION]
+      }]
+    }, {
+      type: StoreDevtoolsConfig,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
+        args: [STORE_DEVTOOLS_CONFIG]
+      }]
+    }, {
+      type: DevtoolsDispatcher
+    }];
+  }, null);
+})();
+
+class StoreDevtools {
+  constructor(dispatcher, actions$, reducers$, extension, scannedActions, errorHandler, initialState, config) {
+    const liftedInitialState = liftInitialState(initialState, config.monitor);
+    const liftReducer = liftReducerWith(initialState, liftedInitialState, errorHandler, config.monitor, config);
+    const liftedAction$ = (0,rxjs__WEBPACK_IMPORTED_MODULE_15__.merge)((0,rxjs__WEBPACK_IMPORTED_MODULE_15__.merge)(actions$.asObservable().pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_16__.skip)(1)), extension.actions$).pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.map)(liftAction)), dispatcher, extension.liftedActions$).pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_17__.observeOn)(rxjs__WEBPACK_IMPORTED_MODULE_18__.queueScheduler));
+    const liftedReducer$ = reducers$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.map)(liftReducer));
+    const liftedStateSubject = new rxjs__WEBPACK_IMPORTED_MODULE_19__.ReplaySubject(1);
+    const liftedStateSubscription = liftedAction$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_20__.withLatestFrom)(liftedReducer$), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_21__.scan)(({
+      state: liftedState
+    }, [action, reducer]) => {
+      let reducedLiftedState = reducer(liftedState, action); // On full state update
+      // If we have actions filters, we must filter completely our lifted state to be sync with the extension
+
+      if (action.type !== PERFORM_ACTION && shouldFilterActions(config)) {
+        reducedLiftedState = filterLiftedState(reducedLiftedState, config.predicate, config.actionsSafelist, config.actionsBlocklist);
+      } // Extension should be sent the sanitized lifted state
+
+
+      extension.notify(action, reducedLiftedState);
+      return {
+        state: reducedLiftedState,
+        action
+      };
+    }, {
+      state: liftedInitialState,
+      action: null
+    })).subscribe(({
+      state,
+      action
+    }) => {
+      liftedStateSubject.next(state);
+
+      if (action.type === PERFORM_ACTION) {
+        const unliftedAction = action.action;
+        scannedActions.next(unliftedAction);
+      }
+    });
+    const extensionStartSubscription = extension.start$.subscribe(() => {
+      this.refresh();
+    });
+    const liftedState$ = liftedStateSubject.asObservable();
+    const state$ = liftedState$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.map)(unliftState));
+    this.extensionStartSubscription = extensionStartSubscription;
+    this.stateSubscription = liftedStateSubscription;
+    this.dispatcher = dispatcher;
+    this.liftedState = liftedState$;
+    this.state = state$;
+  }
+
+  dispatch(action) {
+    this.dispatcher.next(action);
+  }
+
+  next(action) {
+    this.dispatcher.next(action);
+  }
+
+  error(error) {}
+
+  complete() {}
+
+  performAction(action) {
+    this.dispatch(new PerformAction(action, +Date.now()));
+  }
+
+  refresh() {
+    this.dispatch(new Refresh());
+  }
+
+  reset() {
+    this.dispatch(new Reset(+Date.now()));
+  }
+
+  rollback() {
+    this.dispatch(new Rollback(+Date.now()));
+  }
+
+  commit() {
+    this.dispatch(new Commit(+Date.now()));
+  }
+
+  sweep() {
+    this.dispatch(new Sweep());
+  }
+
+  toggleAction(id) {
+    this.dispatch(new ToggleAction(id));
+  }
+
+  jumpToAction(actionId) {
+    this.dispatch(new JumpToAction(actionId));
+  }
+
+  jumpToState(index) {
+    this.dispatch(new JumpToState(index));
+  }
+
+  importState(nextLiftedState) {
+    this.dispatch(new ImportState(nextLiftedState));
+  }
+
+  lockChanges(status) {
+    this.dispatch(new LockChanges(status));
+  }
+
+  pauseRecording(status) {
+    this.dispatch(new PauseRecording(status));
+  }
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreDevtools.ɵfac = function StoreDevtools_Factory(t) {
+  return new (t || StoreDevtools)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](DevtoolsDispatcher), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_ngrx_store__WEBPACK_IMPORTED_MODULE_1__.ActionsSubject), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_ngrx_store__WEBPACK_IMPORTED_MODULE_1__.ReducerObservable), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](DevtoolsExtension), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_ngrx_store__WEBPACK_IMPORTED_MODULE_1__.ScannedActionsSubject), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.ErrorHandler), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_ngrx_store__WEBPACK_IMPORTED_MODULE_1__.INITIAL_STATE), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](STORE_DEVTOOLS_CONFIG));
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreDevtools.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjectable"]({
+  token: StoreDevtools,
+  factory: StoreDevtools.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](StoreDevtools, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Injectable
+  }], function () {
+    return [{
+      type: DevtoolsDispatcher
+    }, {
+      type: _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.ActionsSubject
+    }, {
+      type: _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.ReducerObservable
+    }, {
+      type: DevtoolsExtension
+    }, {
+      type: _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.ScannedActionsSubject
+    }, {
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ErrorHandler
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
+        args: [_ngrx_store__WEBPACK_IMPORTED_MODULE_1__.INITIAL_STATE]
+      }]
+    }, {
+      type: StoreDevtoolsConfig,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
+        args: [STORE_DEVTOOLS_CONFIG]
+      }]
+    }];
+  }, null);
+})();
+
+const IS_EXTENSION_OR_MONITOR_PRESENT = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.InjectionToken('@ngrx/store-devtools Is Devtools Extension or Monitor Present');
+
+function createIsExtensionOrMonitorPresent(extension, config) {
+  return Boolean(extension) || config.monitor !== noMonitor;
+}
+
+function createReduxDevtoolsExtension() {
+  const extensionKey = '__REDUX_DEVTOOLS_EXTENSION__';
+
+  if (typeof window === 'object' && typeof window[extensionKey] !== 'undefined') {
+    return window[extensionKey];
+  } else {
+    return null;
+  }
+}
+
+function createStateObservable(devtools) {
+  return devtools.state;
+}
+
+class StoreDevtoolsModule {
+  static instrument(options = {}) {
+    return {
+      ngModule: StoreDevtoolsModule,
+      providers: [DevtoolsExtension, DevtoolsDispatcher, StoreDevtools, {
+        provide: INITIAL_OPTIONS,
+        useValue: options
+      }, {
+        provide: IS_EXTENSION_OR_MONITOR_PRESENT,
+        deps: [REDUX_DEVTOOLS_EXTENSION, STORE_DEVTOOLS_CONFIG],
+        useFactory: createIsExtensionOrMonitorPresent
+      }, {
+        provide: REDUX_DEVTOOLS_EXTENSION,
+        useFactory: createReduxDevtoolsExtension
+      }, {
+        provide: STORE_DEVTOOLS_CONFIG,
+        deps: [INITIAL_OPTIONS],
+        useFactory: createConfig
+      }, {
+        provide: _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.StateObservable,
+        deps: [StoreDevtools],
+        useFactory: createStateObservable
+      }, {
+        provide: _ngrx_store__WEBPACK_IMPORTED_MODULE_1__.ReducerManagerDispatcher,
+        useExisting: DevtoolsDispatcher
+      }]
+    };
+  }
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreDevtoolsModule.ɵfac = function StoreDevtoolsModule_Factory(t) {
+  return new (t || StoreDevtoolsModule)();
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreDevtoolsModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineNgModule"]({
+  type: StoreDevtoolsModule
+});
+/** @nocollapse */
+
+/** @nocollapse */
+
+StoreDevtoolsModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjector"]({});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](StoreDevtoolsModule, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgModule,
+    args: [{}]
+  }], null, null);
+})();
+/**
+ * DO NOT EDIT
+ *
+ * This file is automatically generated at build
+ */
+
+/**
+ * Generated bundle index. Do not edit.
+ */
+
+
+
+
+/***/ }),
+
+/***/ 5585:
+/*!**********************************************************!*\
+  !*** ./node_modules/@ngrx/store/fesm2015/ngrx-store.mjs ***!
+  \**********************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ACTIVE_RUNTIME_CHECKS": () => (/* binding */ ACTIVE_RUNTIME_CHECKS),
+/* harmony export */   "ActionsSubject": () => (/* binding */ ActionsSubject),
+/* harmony export */   "FEATURE_REDUCERS": () => (/* binding */ FEATURE_REDUCERS),
+/* harmony export */   "INIT": () => (/* binding */ INIT),
+/* harmony export */   "INITIAL_REDUCERS": () => (/* binding */ INITIAL_REDUCERS),
+/* harmony export */   "INITIAL_STATE": () => (/* binding */ INITIAL_STATE),
+/* harmony export */   "META_REDUCERS": () => (/* binding */ META_REDUCERS),
+/* harmony export */   "REDUCER_FACTORY": () => (/* binding */ REDUCER_FACTORY),
+/* harmony export */   "ReducerManager": () => (/* binding */ ReducerManager),
+/* harmony export */   "ReducerManagerDispatcher": () => (/* binding */ ReducerManagerDispatcher),
+/* harmony export */   "ReducerObservable": () => (/* binding */ ReducerObservable),
+/* harmony export */   "STORE_FEATURES": () => (/* binding */ STORE_FEATURES),
+/* harmony export */   "ScannedActionsSubject": () => (/* binding */ ScannedActionsSubject),
+/* harmony export */   "State": () => (/* binding */ State),
+/* harmony export */   "StateObservable": () => (/* binding */ StateObservable),
+/* harmony export */   "Store": () => (/* binding */ Store),
+/* harmony export */   "StoreFeatureModule": () => (/* binding */ StoreFeatureModule),
+/* harmony export */   "StoreModule": () => (/* binding */ StoreModule),
+/* harmony export */   "StoreRootModule": () => (/* binding */ StoreRootModule),
+/* harmony export */   "UPDATE": () => (/* binding */ UPDATE),
+/* harmony export */   "USER_PROVIDED_META_REDUCERS": () => (/* binding */ USER_PROVIDED_META_REDUCERS),
+/* harmony export */   "USER_RUNTIME_CHECKS": () => (/* binding */ USER_RUNTIME_CHECKS),
+/* harmony export */   "combineReducers": () => (/* binding */ combineReducers),
+/* harmony export */   "compose": () => (/* binding */ compose),
+/* harmony export */   "createAction": () => (/* binding */ createAction),
+/* harmony export */   "createActionGroup": () => (/* binding */ createActionGroup),
+/* harmony export */   "createFeature": () => (/* binding */ createFeature),
+/* harmony export */   "createFeatureSelector": () => (/* binding */ createFeatureSelector),
+/* harmony export */   "createReducer": () => (/* binding */ createReducer),
+/* harmony export */   "createReducerFactory": () => (/* binding */ createReducerFactory),
+/* harmony export */   "createSelector": () => (/* binding */ createSelector),
+/* harmony export */   "createSelectorFactory": () => (/* binding */ createSelectorFactory),
+/* harmony export */   "defaultMemoize": () => (/* binding */ defaultMemoize),
+/* harmony export */   "defaultStateFn": () => (/* binding */ defaultStateFn),
+/* harmony export */   "emptyProps": () => (/* binding */ emptyProps),
+/* harmony export */   "isNgrxMockEnvironment": () => (/* binding */ isNgrxMockEnvironment),
+/* harmony export */   "on": () => (/* binding */ on),
+/* harmony export */   "props": () => (/* binding */ props),
+/* harmony export */   "reduceState": () => (/* binding */ reduceState),
+/* harmony export */   "resultMemoize": () => (/* binding */ resultMemoize),
+/* harmony export */   "select": () => (/* binding */ select),
+/* harmony export */   "setNgrxMockEnvironment": () => (/* binding */ setNgrxMockEnvironment),
+/* harmony export */   "union": () => (/* binding */ union)
+/* harmony export */ });
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ 3184);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! rxjs */ 4505);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! rxjs */ 2378);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs */ 2218);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! rxjs */ 8198);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs/operators */ 3888);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! rxjs/operators */ 1745);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! rxjs/operators */ 2647);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! rxjs/operators */ 2428);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! rxjs/operators */ 6942);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! rxjs/operators */ 3298);
+
+
+
+
+const REGISTERED_ACTION_TYPES = {};
+
+function resetRegisteredActionTypes() {
+  for (const key of Object.keys(REGISTERED_ACTION_TYPES)) {
+    delete REGISTERED_ACTION_TYPES[key];
+  }
+}
+/**
+ * @description
+ * Creates a configured `Creator` function that, when called, returns an object in the shape of the `Action` interface.
+ *
+ * Action creators reduce the explicitness of class-based action creators.
+ *
+ * @param type Describes the action that will be dispatched
+ * @param config Additional metadata needed for the handling of the action.  See {@link createAction#usage-notes Usage Notes}.
+ *
+ * @usageNotes
+ *
+ * **Declaring an action creator**
+ *
+ * Without additional metadata:
+ * ```ts
+ * export const increment = createAction('[Counter] Increment');
+ * ```
+ * With additional metadata:
+ * ```ts
+ * export const loginSuccess = createAction(
+ *   '[Auth/API] Login Success',
+ *   props<{ user: User }>()
+ * );
+ * ```
+ * With a function:
+ * ```ts
+ * export const loginSuccess = createAction(
+ *   '[Auth/API] Login Success',
+ *   (response: Response) => response.user
+ * );
+ * ```
+ *
+ * **Dispatching an action**
+ *
+ * Without additional metadata:
+ * ```ts
+ * store.dispatch(increment());
+ * ```
+ * With additional metadata:
+ * ```ts
+ * store.dispatch(loginSuccess({ user: newUser }));
+ * ```
+ *
+ * **Referencing an action in a reducer**
+ *
+ * Using a switch statement:
+ * ```ts
+ * switch (action.type) {
+ *   // ...
+ *   case AuthApiActions.loginSuccess.type: {
+ *     return {
+ *       ...state,
+ *       user: action.user
+ *     };
+ *   }
+ * }
+ * ```
+ * Using a reducer creator:
+ * ```ts
+ * on(AuthApiActions.loginSuccess, (state, { user }) => ({ ...state, user }))
+ * ```
+ *
+ *  **Referencing an action in an effect**
+ * ```ts
+ * effectName$ = createEffect(
+ *   () => this.actions$.pipe(
+ *     ofType(AuthApiActions.loginSuccess),
+ *     // ...
+ *   )
+ * );
+ * ```
+ */
+
+
+function createAction(type, config) {
+  REGISTERED_ACTION_TYPES[type] = (REGISTERED_ACTION_TYPES[type] || 0) + 1;
+
+  if (typeof config === 'function') {
+    return defineType(type, (...args) => Object.assign(Object.assign({}, config(...args)), {
+      type
+    }));
+  }
+
+  const as = config ? config._as : 'empty';
+
+  switch (as) {
+    case 'empty':
+      return defineType(type, () => ({
+        type
+      }));
+
+    case 'props':
+      return defineType(type, props => Object.assign(Object.assign({}, props), {
+        type
+      }));
+
+    default:
+      throw new Error('Unexpected config.');
+  }
+}
+
+function props() {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion, @typescript-eslint/naming-convention
+  return {
+    _as: 'props',
+    _p: undefined
+  };
+}
+
+function union(creators) {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return undefined;
+}
+
+function defineType(type, creator) {
+  return Object.defineProperty(creator, 'type', {
+    value: type,
+    writable: false
+  });
+}
+
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.substr(1);
+}
+/**
+ * @description
+ * A function that creates a group of action creators with the same source.
+ *
+ * @param config An object that contains a source and dictionary of events.
+ * An event is a key-value pair of an event name and event props.
+ * @returns A dictionary of action creators.
+ * The name of each action creator is created by camel casing the event name.
+ * The type of each action is created using the "[Source] Event Name" pattern.
+ *
+ * @usageNotes
+ *
+ * ```ts
+ * const authApiActions = createActionGroup({
+ *   source: 'Auth API',
+ *   events: {
+ *     // defining events with payload using the `props` function
+ *     'Login Success': props<{ userId: number; token: string }>(),
+ *     'Login Failure': props<{ error: string }>(),
+ *
+ *     // defining an event without payload using the `emptyProps` function
+ *     'Logout Success': emptyProps(),
+ *
+ *     // defining an event with payload using the props factory
+ *     'Logout Failure': (error: Error) => ({ error }),
+ *   },
+ * });
+ *
+ * // action type: "[Auth API] Login Success"
+ * authApiActions.loginSuccess({ userId: 10, token: 'ngrx' });
+ *
+ * // action type: "[Auth API] Login Failure"
+ * authApiActions.loginFailure({ error: 'Login Failure!' });
+ *
+ * // action type: "[Auth API] Logout Success"
+ * authApiActions.logoutSuccess();
+ *
+ * // action type: "[Auth API] Logout Failure";
+ * authApiActions.logoutFailure(new Error('Logout Failure!'));
+ * ```
+ */
+
+
+function createActionGroup(config) {
+  const {
+    source,
+    events
+  } = config;
+  return Object.keys(events).reduce((actionGroup, eventName) => Object.assign(Object.assign({}, actionGroup), {
+    [toActionName(eventName)]: createAction(toActionType(source, eventName), events[eventName])
+  }), {});
+}
+
+function emptyProps() {
+  return props();
+}
+
+function toActionName(eventName) {
+  return eventName.trim().toLowerCase().split(' ').map((word, i) => i === 0 ? word : capitalize(word)).join('');
+}
+
+function toActionType(source, eventName) {
+  return `[${source}] ${eventName}`;
+}
+
+const INIT = '@ngrx/store/init';
+
+class ActionsSubject extends rxjs__WEBPACK_IMPORTED_MODULE_0__.BehaviorSubject {
+  constructor() {
+    super({
+      type: INIT
+    });
+  }
+
+  next(action) {
+    if (typeof action === 'function') {
+      throw new TypeError(`
+        Dispatch expected an object, instead it received a function.
+        If you're using the createAction function, make sure to invoke the function
+        before dispatching the action. For example, someAction should be someAction().`);
+    } else if (typeof action === 'undefined') {
+      throw new TypeError(`Actions must be objects`);
+    } else if (typeof action.type === 'undefined') {
+      throw new TypeError(`Actions must have a type property`);
+    }
+
+    super.next(action);
+  }
+
+  complete() {
+    /* noop */
+  }
+
+  ngOnDestroy() {
+    super.complete();
+  }
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+ActionsSubject.ɵfac = function ActionsSubject_Factory(t) {
+  return new (t || ActionsSubject)();
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+ActionsSubject.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjectable"]({
+  token: ActionsSubject,
+  factory: ActionsSubject.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](ActionsSubject, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Injectable
+  }], function () {
+    return [];
+  }, null);
+})();
+
+const ACTIONS_SUBJECT_PROVIDERS = [ActionsSubject];
+
+const _ROOT_STORE_GUARD = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Root Guard');
+
+const _INITIAL_STATE = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Initial State');
+
+const INITIAL_STATE = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Initial State');
+const REDUCER_FACTORY = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Reducer Factory');
+
+const _REDUCER_FACTORY = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Reducer Factory Provider');
+
+const INITIAL_REDUCERS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Initial Reducers');
+
+const _INITIAL_REDUCERS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Initial Reducers');
+
+const STORE_FEATURES = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Store Features');
+
+const _STORE_REDUCERS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Store Reducers');
+
+const _FEATURE_REDUCERS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Feature Reducers');
+
+const _FEATURE_CONFIGS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Feature Configs');
+
+const _STORE_FEATURES = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Store Features');
+
+const _FEATURE_REDUCERS_TOKEN = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Feature Reducers Token');
+
+const FEATURE_REDUCERS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Feature Reducers');
+/**
+ * User-defined meta reducers from StoreModule.forRoot()
+ */
+
+const USER_PROVIDED_META_REDUCERS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store User Provided Meta Reducers');
+/**
+ * Meta reducers defined either internally by @ngrx/store or by library authors
+ */
+
+const META_REDUCERS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Meta Reducers');
+/**
+ * Concats the user provided meta reducers and the meta reducers provided on the multi
+ * injection token
+ */
+
+const _RESOLVED_META_REDUCERS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Resolved Meta Reducers');
+/**
+ * Runtime checks defined by the user via an InjectionToken
+ * Defaults to `_USER_RUNTIME_CHECKS`
+ */
+
+
+const USER_RUNTIME_CHECKS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store User Runtime Checks Config');
+/**
+ * Runtime checks defined by the user via forRoot()
+ */
+
+const _USER_RUNTIME_CHECKS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal User Runtime Checks Config');
+/**
+ * Runtime checks currently in use
+ */
+
+
+const ACTIVE_RUNTIME_CHECKS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Internal Runtime Checks');
+
+const _ACTION_TYPE_UNIQUENESS_CHECK = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('@ngrx/store Check if Action types are unique');
+/**
+ * @description
+ * Combines reducers for individual features into a single reducer.
+ *
+ * You can use this function to delegate handling of state transitions to multiple reducers, each acting on their
+ * own sub-state within the root state.
+ *
+ * @param reducers An object mapping keys of the root state to their corresponding feature reducer.
+ * @param initialState Provides a state value if the current state is `undefined`, as it is initially.
+ * @returns A reducer function.
+ *
+ * @usageNotes
+ *
+ * **Example combining two feature reducers into one "root" reducer**
+ *
+ * ```ts
+ * export const reducer = combineReducers({
+ *   featureA: featureAReducer,
+ *   featureB: featureBReducer
+ * });
+ * ```
+ *
+ * You can also override the initial states of the sub-features:
+ * ```ts
+ * export const reducer = combineReducers({
+ *   featureA: featureAReducer,
+ *   featureB: featureBReducer
+ * }, {
+ *   featureA: { counterA: 13 },
+ *   featureB: { counterB: 37 }
+ * });
+ * ```
+ */
+
+
+function combineReducers(reducers, initialState = {}) {
+  const reducerKeys = Object.keys(reducers);
+  const finalReducers = {};
+
+  for (let i = 0; i < reducerKeys.length; i++) {
+    const key = reducerKeys[i];
+
+    if (typeof reducers[key] === 'function') {
+      finalReducers[key] = reducers[key];
+    }
+  }
+
+  const finalReducerKeys = Object.keys(finalReducers);
+  return function combination(state, action) {
+    state = state === undefined ? initialState : state;
+    let hasChanged = false;
+    const nextState = {};
+
+    for (let i = 0; i < finalReducerKeys.length; i++) {
+      const key = finalReducerKeys[i];
+      const reducer = finalReducers[key];
+      const previousStateForKey = state[key];
+      const nextStateForKey = reducer(previousStateForKey, action);
+      nextState[key] = nextStateForKey;
+      hasChanged = hasChanged || nextStateForKey !== previousStateForKey;
+    }
+
+    return hasChanged ? nextState : state;
+  };
+}
+
+function omit(object, keyToRemove) {
+  return Object.keys(object).filter(key => key !== keyToRemove).reduce((result, key) => Object.assign(result, {
+    [key]: object[key]
+  }), {});
+}
+
+function compose(...functions) {
+  return function (arg) {
+    if (functions.length === 0) {
+      return arg;
+    }
+
+    const last = functions[functions.length - 1];
+    const rest = functions.slice(0, -1);
+    return rest.reduceRight((composed, fn) => fn(composed), last(arg));
+  };
+}
+
+function createReducerFactory(reducerFactory, metaReducers) {
+  if (Array.isArray(metaReducers) && metaReducers.length > 0) {
+    reducerFactory = compose.apply(null, [...metaReducers, reducerFactory]);
+  }
+
+  return (reducers, initialState) => {
+    const reducer = reducerFactory(reducers);
+    return (state, action) => {
+      state = state === undefined ? initialState : state;
+      return reducer(state, action);
+    };
+  };
+}
+
+function createFeatureReducerFactory(metaReducers) {
+  const reducerFactory = Array.isArray(metaReducers) && metaReducers.length > 0 ? compose(...metaReducers) : r => r;
+  return (reducer, initialState) => {
+    reducer = reducerFactory(reducer);
+    return (state, action) => {
+      state = state === undefined ? initialState : state;
+      return reducer(state, action);
+    };
+  };
+}
+
+class ReducerObservable extends rxjs__WEBPACK_IMPORTED_MODULE_2__.Observable {}
+
+class ReducerManagerDispatcher extends ActionsSubject {}
+
+const UPDATE = '@ngrx/store/update-reducers';
+
+class ReducerManager extends rxjs__WEBPACK_IMPORTED_MODULE_0__.BehaviorSubject {
+  constructor(dispatcher, initialState, reducers, reducerFactory) {
+    super(reducerFactory(reducers, initialState));
+    this.dispatcher = dispatcher;
+    this.initialState = initialState;
+    this.reducers = reducers;
+    this.reducerFactory = reducerFactory;
+  }
+
+  get currentReducers() {
+    return this.reducers;
+  }
+
+  addFeature(feature) {
+    this.addFeatures([feature]);
+  }
+
+  addFeatures(features) {
+    const reducers = features.reduce((reducerDict, {
+      reducers,
+      reducerFactory,
+      metaReducers,
+      initialState,
+      key
+    }) => {
+      const reducer = typeof reducers === 'function' ? createFeatureReducerFactory(metaReducers)(reducers, initialState) : createReducerFactory(reducerFactory, metaReducers)(reducers, initialState);
+      reducerDict[key] = reducer;
+      return reducerDict;
+    }, {});
+    this.addReducers(reducers);
+  }
+
+  removeFeature(feature) {
+    this.removeFeatures([feature]);
+  }
+
+  removeFeatures(features) {
+    this.removeReducers(features.map(p => p.key));
+  }
+
+  addReducer(key, reducer) {
+    this.addReducers({
+      [key]: reducer
+    });
+  }
+
+  addReducers(reducers) {
+    this.reducers = Object.assign(Object.assign({}, this.reducers), reducers);
+    this.updateReducers(Object.keys(reducers));
+  }
+
+  removeReducer(featureKey) {
+    this.removeReducers([featureKey]);
+  }
+
+  removeReducers(featureKeys) {
+    featureKeys.forEach(key => {
+      this.reducers = omit(this.reducers, key)
+      /*TODO(#823)*/
+      ;
+    });
+    this.updateReducers(featureKeys);
+  }
+
+  updateReducers(featureKeys) {
+    this.next(this.reducerFactory(this.reducers, this.initialState));
+    this.dispatcher.next({
+      type: UPDATE,
+      features: featureKeys
+    });
+  }
+
+  ngOnDestroy() {
+    this.complete();
+  }
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+ReducerManager.ɵfac = function ReducerManager_Factory(t) {
+  return new (t || ReducerManager)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ReducerManagerDispatcher), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](INITIAL_STATE), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](INITIAL_REDUCERS), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](REDUCER_FACTORY));
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+ReducerManager.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjectable"]({
+  token: ReducerManager,
+  factory: ReducerManager.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](ReducerManager, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Injectable
+  }], function () {
+    return [{
+      type: ReducerManagerDispatcher
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [INITIAL_STATE]
+      }]
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [INITIAL_REDUCERS]
+      }]
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [REDUCER_FACTORY]
+      }]
+    }];
+  }, null);
+})();
+
+const REDUCER_MANAGER_PROVIDERS = [ReducerManager, {
+  provide: ReducerObservable,
+  useExisting: ReducerManager
+}, {
+  provide: ReducerManagerDispatcher,
+  useExisting: ActionsSubject
+}];
+
+class ScannedActionsSubject extends rxjs__WEBPACK_IMPORTED_MODULE_3__.Subject {
+  ngOnDestroy() {
+    this.complete();
+  }
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+ScannedActionsSubject.ɵfac = /* @__PURE__ */function () {
+  let ɵScannedActionsSubject_BaseFactory;
+  return function ScannedActionsSubject_Factory(t) {
+    return (ɵScannedActionsSubject_BaseFactory || (ɵScannedActionsSubject_BaseFactory = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵgetInheritedFactory"](ScannedActionsSubject)))(t || ScannedActionsSubject);
+  };
+}();
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+ScannedActionsSubject.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjectable"]({
+  token: ScannedActionsSubject,
+  factory: ScannedActionsSubject.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](ScannedActionsSubject, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Injectable
+  }], null, null);
+})();
+
+const SCANNED_ACTIONS_SUBJECT_PROVIDERS = [ScannedActionsSubject];
+
+class StateObservable extends rxjs__WEBPACK_IMPORTED_MODULE_2__.Observable {}
+
+class State extends rxjs__WEBPACK_IMPORTED_MODULE_0__.BehaviorSubject {
+  constructor(actions$, reducer$, scannedActions, initialState) {
+    super(initialState);
+    const actionsOnQueue$ = actions$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.observeOn)(rxjs__WEBPACK_IMPORTED_MODULE_5__.queueScheduler));
+    const withLatestReducer$ = actionsOnQueue$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.withLatestFrom)(reducer$));
+    const seed = {
+      state: initialState
+    };
+    const stateAndAction$ = withLatestReducer$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_7__.scan)(reduceState, seed));
+    this.stateSubscription = stateAndAction$.subscribe(({
+      state,
+      action
+    }) => {
+      this.next(state);
+      scannedActions.next(action);
+    });
+  }
+
+  ngOnDestroy() {
+    this.stateSubscription.unsubscribe();
+    this.complete();
+  }
+
+}
+
+State.INIT = INIT;
+/** @nocollapse */
+
+/** @nocollapse */
+
+State.ɵfac = function State_Factory(t) {
+  return new (t || State)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ActionsSubject), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ReducerObservable), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ScannedActionsSubject), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](INITIAL_STATE));
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+State.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjectable"]({
+  token: State,
+  factory: State.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](State, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Injectable
+  }], function () {
+    return [{
+      type: ActionsSubject
+    }, {
+      type: ReducerObservable
+    }, {
+      type: ScannedActionsSubject
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [INITIAL_STATE]
+      }]
+    }];
+  }, null);
+})();
+
+function reduceState(stateActionPair = {
+  state: undefined
+}, [action, reducer]) {
+  const {
+    state
+  } = stateActionPair;
+  return {
+    state: reducer(state, action),
+    action
+  };
+}
+
+const STATE_PROVIDERS = [State, {
+  provide: StateObservable,
+  useExisting: State
+}];
+/* eslint-disable @typescript-eslint/naming-convention */
+
+class Store extends rxjs__WEBPACK_IMPORTED_MODULE_2__.Observable {
+  constructor(state$, actionsObserver, reducerManager) {
+    super();
+    this.actionsObserver = actionsObserver;
+    this.reducerManager = reducerManager;
+    this.source = state$;
+  }
+
+  select(pathOrMapFn, ...paths) {
+    return select.call(null, pathOrMapFn, ...paths)(this);
+  }
+
+  lift(operator) {
+    const store = new Store(this, this.actionsObserver, this.reducerManager);
+    store.operator = operator;
+    return store;
+  }
+
+  dispatch(action) {
+    this.actionsObserver.next(action);
+  }
+
+  next(action) {
+    this.actionsObserver.next(action);
+  }
+
+  error(err) {
+    this.actionsObserver.error(err);
+  }
+
+  complete() {
+    this.actionsObserver.complete();
+  }
+
+  addReducer(key, reducer) {
+    this.reducerManager.addReducer(key, reducer);
+  }
+
+  removeReducer(key) {
+    this.reducerManager.removeReducer(key);
+  }
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+Store.ɵfac = function Store_Factory(t) {
+  return new (t || Store)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](StateObservable), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ActionsSubject), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ReducerManager));
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+Store.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjectable"]({
+  token: Store,
+  factory: Store.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](Store, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Injectable
+  }], function () {
+    return [{
+      type: StateObservable
+    }, {
+      type: ActionsSubject
+    }, {
+      type: ReducerManager
+    }];
+  }, null);
+})();
+
+const STORE_PROVIDERS = [Store];
+
+function select(pathOrMapFn, propsOrPath, ...paths) {
+  return function selectOperator(source$) {
+    let mapped$;
+
+    if (typeof pathOrMapFn === 'string') {
+      const pathSlices = [propsOrPath, ...paths].filter(Boolean);
+      mapped$ = source$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_8__.pluck)(pathOrMapFn, ...pathSlices));
+    } else if (typeof pathOrMapFn === 'function') {
+      mapped$ = source$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_9__.map)(source => pathOrMapFn(source, propsOrPath)));
+    } else {
+      throw new TypeError(`Unexpected type '${typeof pathOrMapFn}' in select operator,` + ` expected 'string' or 'function'`);
+    }
+
+    return mapped$.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_10__.distinctUntilChanged)());
+  };
+}
+
+const RUNTIME_CHECK_URL = 'https://ngrx.io/guide/store/configuration/runtime-checks';
+
+function isUndefined(target) {
+  return target === undefined;
+}
+
+function isNull(target) {
+  return target === null;
+}
+
+function isArray(target) {
+  return Array.isArray(target);
+}
+
+function isString(target) {
+  return typeof target === 'string';
+}
+
+function isBoolean(target) {
+  return typeof target === 'boolean';
+}
+
+function isNumber(target) {
+  return typeof target === 'number';
+}
+
+function isObjectLike(target) {
+  return typeof target === 'object' && target !== null;
+}
+
+function isObject(target) {
+  return isObjectLike(target) && !isArray(target);
+}
+
+function isPlainObject(target) {
+  if (!isObject(target)) {
+    return false;
+  }
+
+  const targetPrototype = Object.getPrototypeOf(target);
+  return targetPrototype === Object.prototype || targetPrototype === null;
+}
+
+function isFunction(target) {
+  return typeof target === 'function';
+}
+
+function isComponent(target) {
+  return isFunction(target) && target.hasOwnProperty('ɵcmp');
+}
+
+function hasOwnProperty(target, propertyName) {
+  return Object.prototype.hasOwnProperty.call(target, propertyName);
+}
+
+let _ngrxMockEnvironment = false;
+
+function setNgrxMockEnvironment(value) {
+  _ngrxMockEnvironment = value;
+}
+
+function isNgrxMockEnvironment() {
+  return _ngrxMockEnvironment;
+}
+
+function isEqualCheck(a, b) {
+  return a === b;
+}
+
+function isArgumentsChanged(args, lastArguments, comparator) {
+  for (let i = 0; i < args.length; i++) {
+    if (!comparator(args[i], lastArguments[i])) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function resultMemoize(projectionFn, isResultEqual) {
+  return defaultMemoize(projectionFn, isEqualCheck, isResultEqual);
+}
+
+function defaultMemoize(projectionFn, isArgumentsEqual = isEqualCheck, isResultEqual = isEqualCheck) {
+  let lastArguments = null; // eslint-disable-next-line @typescript-eslint/no-explicit-any, , , , ,
+
+  let lastResult = null;
+  let overrideResult;
+
+  function reset() {
+    lastArguments = null;
+    lastResult = null;
+  }
+
+  function setResult(result = undefined) {
+    overrideResult = {
+      result
+    };
+  }
+
+  function clearResult() {
+    overrideResult = undefined;
+  }
+  /* eslint-disable prefer-rest-params, prefer-spread */
+  // disabled because of the use of `arguments`
+
+
+  function memoized() {
+    if (overrideResult !== undefined) {
+      return overrideResult.result;
+    }
+
+    if (!lastArguments) {
+      lastResult = projectionFn.apply(null, arguments);
+      lastArguments = arguments;
+      return lastResult;
+    }
+
+    if (!isArgumentsChanged(arguments, lastArguments, isArgumentsEqual)) {
+      return lastResult;
+    }
+
+    const newResult = projectionFn.apply(null, arguments);
+    lastArguments = arguments;
+
+    if (isResultEqual(lastResult, newResult)) {
+      return lastResult;
+    }
+
+    lastResult = newResult;
+    return newResult;
+  }
+
+  return {
+    memoized,
+    reset,
+    setResult,
+    clearResult
+  };
+}
+
+function createSelector(...input) {
+  return createSelectorFactory(defaultMemoize)(...input);
+}
+
+function defaultStateFn(state, selectors, props, memoizedProjector) {
+  if (props === undefined) {
+    const args = selectors.map(fn => fn(state));
+    return memoizedProjector.memoized.apply(null, args);
+  }
+
+  const args = selectors.map(fn => fn(state, props));
+  return memoizedProjector.memoized.apply(null, [...args, props]);
+}
+/**
+ *
+ * @param memoize The function used to memoize selectors
+ * @param options Config Object that may include a `stateFn` function defining how to return the selector's value, given the entire `Store`'s state, parent `Selector`s, `Props`, and a `MemoizedProjection`
+ *
+ * @usageNotes
+ *
+ * **Creating a Selector Factory Where Array Order Does Not Matter**
+ *
+ * ```ts
+ * function removeMatch(arr: string[], target: string): string[] {
+ *   const matchIndex = arr.indexOf(target);
+ *   return [...arr.slice(0, matchIndex), ...arr.slice(matchIndex + 1)];
+ * }
+ *
+ * function orderDoesNotMatterComparer(a: any, b: any): boolean {
+ *   if (!Array.isArray(a) || !Array.isArray(b)) {
+ *     return a === b;
+ *   }
+ *   if (a.length !== b.length) {
+ *     return false;
+ *   }
+ *   let tempB = [...b];
+ *   function reduceToDetermineIfArraysContainSameContents(
+ *     previousCallResult: boolean,
+ *     arrayMember: any
+ *   ): boolean {
+ *     if (previousCallResult === false) {
+ *       return false;
+ *     }
+ *     if (tempB.includes(arrayMember)) {
+ *       tempB = removeMatch(tempB, arrayMember);
+ *       return true;
+ *     }
+ *     return false;
+ *   }
+ *   return a.reduce(reduceToDetermineIfArraysContainSameContents, true);
+ * }
+ *
+ * export const creactOrderDoesNotMatterSelector = createSelectorFactory(
+ *   (projectionFun) => defaultMemoize(
+ *     projectionFun,
+ *     orderDoesNotMatterComparer,
+ *     orderDoesNotMatterComparer
+ *   )
+ * );
+ * ```
+ *
+ * **Creating an Alternative Memoization Strategy**
+ *
+ * ```ts
+ * function serialize(x: any): string {
+ *   return JSON.stringify(x);
+ * }
+ *
+ * export const createFullHistorySelector = createSelectorFactory(
+ *  (projectionFunction) => {
+ *    const cache = {};
+ *
+ *    function memoized() {
+ *      const serializedArguments = serialize(...arguments);
+ *       if (cache[serializedArguments] != null) {
+ *         cache[serializedArguments] = projectionFunction.apply(null, arguments);
+ *       }
+ *       return cache[serializedArguments];
+ *     }
+ *     return {
+ *       memoized,
+ *       reset: () => {},
+ *       setResult: () => {},
+ *       clearResult: () => {},
+ *     };
+ *   }
+ * );
+ * ```
+ *
+ *
+ */
+
+
+function createSelectorFactory(memoize, options = {
+  stateFn: defaultStateFn
+}) {
+  return function (...input) {
+    let args = input;
+
+    if (Array.isArray(args[0])) {
+      const [head, ...tail] = args;
+      args = [...head, ...tail];
+    }
+
+    const selectors = args.slice(0, args.length - 1);
+    const projector = args[args.length - 1];
+    const memoizedSelectors = selectors.filter(selector => selector.release && typeof selector.release === 'function');
+    const memoizedProjector = memoize(function (...selectors) {
+      return projector.apply(null, selectors);
+    });
+    const memoizedState = defaultMemoize(function (state, props) {
+      return options.stateFn.apply(null, [state, selectors, props, memoizedProjector]);
+    });
+
+    function release() {
+      memoizedState.reset();
+      memoizedProjector.reset();
+      memoizedSelectors.forEach(selector => selector.release());
+    }
+
+    return Object.assign(memoizedState.memoized, {
+      release,
+      projector: memoizedProjector.memoized,
+      setResult: memoizedState.setResult,
+      clearResult: memoizedState.clearResult
+    });
+  };
+}
+
+function createFeatureSelector(featureName) {
+  return createSelector(state => {
+    const featureState = state[featureName];
+
+    if (!isNgrxMockEnvironment() && (0,_angular_core__WEBPACK_IMPORTED_MODULE_1__.isDevMode)() && !(featureName in state)) {
+      console.warn(`@ngrx/store: The feature name "${featureName}" does ` + 'not exist in the state, therefore createFeatureSelector ' + 'cannot access it.  Be sure it is imported in a loaded module ' + `using StoreModule.forRoot('${featureName}', ...) or ` + `StoreModule.forFeature('${featureName}', ...).  If the default ` + 'state is intended to be undefined, as is the case with router ' + 'state, this development-only warning message can be ignored.');
+    }
+
+    return featureState;
+  }, featureState => featureState);
+}
+/**
+ * @description
+ * A function that accepts a feature name and a feature reducer, and creates
+ * a feature selector and a selector for each feature state property.
+ *
+ * @param featureConfig An object that contains a feature name and a feature reducer.
+ * @returns An object that contains a feature name, a feature reducer,
+ * a feature selector, and a selector for each feature state property.
+ *
+ * @usageNotes
+ *
+ * **With Application State**
+ *
+ * ```ts
+ * interface AppState {
+ *   products: ProductsState;
+ * }
+ *
+ * interface ProductsState {
+ *   products: Product[];
+ *   selectedId: string | null;
+ * }
+ *
+ * const initialState: ProductsState = {
+ *   products: [],
+ *   selectedId: null,
+ * };
+ *
+ * // AppState is passed as a generic argument
+ * const productsFeature = createFeature<AppState>({
+ *   name: 'products',
+ *   reducer: createReducer(
+ *     initialState,
+ *     on(ProductsApiActions.loadSuccess(state, { products }) => ({
+ *       ...state,
+ *       products,
+ *     }),
+ *   ),
+ * });
+ *
+ * const {
+ *   selectProductsState, // type: MemoizedSelector<AppState, ProductsState>
+ *   selectProducts, // type: MemoizedSelector<AppState, Product[]>
+ *   selectSelectedId, // type: MemoizedSelector<AppState, string | null>
+ * } = productsFeature;
+ * ```
+ *
+ * **Without Application State**
+ *
+ * ```ts
+ * const productsFeature = createFeature({
+ *   name: 'products',
+ *   reducer: createReducer(initialState),
+ * });
+ *
+ * const {
+ *   selectProductsState, // type: MemoizedSelector<Record<string, any>, ProductsState>
+ *   selectProducts, // type: MemoizedSelector<Record<string, any>, Product[]>
+ *   selectSelectedId, // type: MemoizedSelector<Record<string, any, string | null>
+ * } = productsFeature;
+ * ```
+ */
+
+
+function createFeature(featureConfig) {
+  const {
+    name,
+    reducer
+  } = featureConfig;
+  const featureSelector = createFeatureSelector(name);
+  const nestedSelectors = createNestedSelectors(featureSelector, reducer);
+  return Object.assign({
+    name,
+    reducer,
+    [`select${capitalize(name)}State`]: featureSelector
+  }, nestedSelectors);
+}
+
+function createNestedSelectors(featureSelector, reducer) {
+  const initialState = getInitialState(reducer);
+  const nestedKeys = isPlainObject(initialState) ? Object.keys(initialState) : [];
+  return nestedKeys.reduce((nestedSelectors, nestedKey) => Object.assign(Object.assign({}, nestedSelectors), {
+    [`select${capitalize(nestedKey)}`]: createSelector(featureSelector, parentState => parentState === null || parentState === void 0 ? void 0 : parentState[nestedKey])
+  }), {});
+}
+
+function getInitialState(reducer) {
+  return reducer(undefined, {
+    type: '@ngrx/feature/init'
+  });
+}
+
+function immutabilityCheckMetaReducer(reducer, checks) {
+  return function (state, action) {
+    const act = checks.action(action) ? freeze(action) : action;
+    const nextState = reducer(state, act);
+    return checks.state() ? freeze(nextState) : nextState;
+  };
+}
+
+function freeze(target) {
+  Object.freeze(target);
+  const targetIsFunction = isFunction(target);
+  Object.getOwnPropertyNames(target).forEach(prop => {
+    // Ignore Ivy properties, ref: https://github.com/ngrx/platform/issues/2109#issuecomment-582689060
+    if (prop.startsWith('ɵ')) {
+      return;
+    }
+
+    if (hasOwnProperty(target, prop) && (targetIsFunction ? prop !== 'caller' && prop !== 'callee' && prop !== 'arguments' : true)) {
+      const propValue = target[prop];
+
+      if ((isObjectLike(propValue) || isFunction(propValue)) && !Object.isFrozen(propValue)) {
+        freeze(propValue);
+      }
+    }
+  });
+  return target;
+}
+
+function serializationCheckMetaReducer(reducer, checks) {
+  return function (state, action) {
+    if (checks.action(action)) {
+      const unserializableAction = getUnserializable(action);
+      throwIfUnserializable(unserializableAction, 'action');
+    }
+
+    const nextState = reducer(state, action);
+
+    if (checks.state()) {
+      const unserializableState = getUnserializable(nextState);
+      throwIfUnserializable(unserializableState, 'state');
+    }
+
+    return nextState;
+  };
+}
+
+function getUnserializable(target, path = []) {
+  // Guard against undefined and null, e.g. a reducer that returns undefined
+  if ((isUndefined(target) || isNull(target)) && path.length === 0) {
+    return {
+      path: ['root'],
+      value: target
+    };
+  }
+
+  const keys = Object.keys(target);
+  return keys.reduce((result, key) => {
+    if (result) {
+      return result;
+    }
+
+    const value = target[key]; // Ignore Ivy components
+
+    if (isComponent(value)) {
+      return result;
+    }
+
+    if (isUndefined(value) || isNull(value) || isNumber(value) || isBoolean(value) || isString(value) || isArray(value)) {
+      return false;
+    }
+
+    if (isPlainObject(value)) {
+      return getUnserializable(value, [...path, key]);
+    }
+
+    return {
+      path: [...path, key],
+      value
+    };
+  }, false);
+}
+
+function throwIfUnserializable(unserializable, context) {
+  if (unserializable === false) {
+    return;
+  }
+
+  const unserializablePath = unserializable.path.join('.');
+  const error = new Error(`Detected unserializable ${context} at "${unserializablePath}". ${RUNTIME_CHECK_URL}#strict${context}serializability`);
+  error.value = unserializable.value;
+  error.unserializablePath = unserializablePath;
+  throw error;
+}
+
+function inNgZoneAssertMetaReducer(reducer, checks) {
+  return function (state, action) {
+    if (checks.action(action) && !_angular_core__WEBPACK_IMPORTED_MODULE_1__.NgZone.isInAngularZone()) {
+      throw new Error(`Action '${action.type}' running outside NgZone. ${RUNTIME_CHECK_URL}#strictactionwithinngzone`);
+    }
+
+    return reducer(state, action);
+  };
+}
+
+function createActiveRuntimeChecks(runtimeChecks) {
+  if ((0,_angular_core__WEBPACK_IMPORTED_MODULE_1__.isDevMode)()) {
+    return Object.assign({
+      strictStateSerializability: false,
+      strictActionSerializability: false,
+      strictStateImmutability: true,
+      strictActionImmutability: true,
+      strictActionWithinNgZone: false,
+      strictActionTypeUniqueness: false
+    }, runtimeChecks);
+  }
+
+  return {
+    strictStateSerializability: false,
+    strictActionSerializability: false,
+    strictStateImmutability: false,
+    strictActionImmutability: false,
+    strictActionWithinNgZone: false,
+    strictActionTypeUniqueness: false
+  };
+}
+
+function createSerializationCheckMetaReducer({
+  strictActionSerializability,
+  strictStateSerializability
+}) {
+  return reducer => strictActionSerializability || strictStateSerializability ? serializationCheckMetaReducer(reducer, {
+    action: action => strictActionSerializability && !ignoreNgrxAction(action),
+    state: () => strictStateSerializability
+  }) : reducer;
+}
+
+function createImmutabilityCheckMetaReducer({
+  strictActionImmutability,
+  strictStateImmutability
+}) {
+  return reducer => strictActionImmutability || strictStateImmutability ? immutabilityCheckMetaReducer(reducer, {
+    action: action => strictActionImmutability && !ignoreNgrxAction(action),
+    state: () => strictStateImmutability
+  }) : reducer;
+}
+
+function ignoreNgrxAction(action) {
+  return action.type.startsWith('@ngrx');
+}
+
+function createInNgZoneCheckMetaReducer({
+  strictActionWithinNgZone
+}) {
+  return reducer => strictActionWithinNgZone ? inNgZoneAssertMetaReducer(reducer, {
+    action: action => strictActionWithinNgZone && !ignoreNgrxAction(action)
+  }) : reducer;
+}
+
+function provideRuntimeChecks(runtimeChecks) {
+  return [{
+    provide: _USER_RUNTIME_CHECKS,
+    useValue: runtimeChecks
+  }, {
+    provide: USER_RUNTIME_CHECKS,
+    useFactory: _runtimeChecksFactory,
+    deps: [_USER_RUNTIME_CHECKS]
+  }, {
+    provide: ACTIVE_RUNTIME_CHECKS,
+    deps: [USER_RUNTIME_CHECKS],
+    useFactory: createActiveRuntimeChecks
+  }, {
+    provide: META_REDUCERS,
+    multi: true,
+    deps: [ACTIVE_RUNTIME_CHECKS],
+    useFactory: createImmutabilityCheckMetaReducer
+  }, {
+    provide: META_REDUCERS,
+    multi: true,
+    deps: [ACTIVE_RUNTIME_CHECKS],
+    useFactory: createSerializationCheckMetaReducer
+  }, {
+    provide: META_REDUCERS,
+    multi: true,
+    deps: [ACTIVE_RUNTIME_CHECKS],
+    useFactory: createInNgZoneCheckMetaReducer
+  }];
+}
+
+function checkForActionTypeUniqueness() {
+  return [{
+    provide: _ACTION_TYPE_UNIQUENESS_CHECK,
+    multi: true,
+    deps: [ACTIVE_RUNTIME_CHECKS],
+    useFactory: _actionTypeUniquenessCheck
+  }];
+}
+
+function _runtimeChecksFactory(runtimeChecks) {
+  return runtimeChecks;
+}
+
+function _actionTypeUniquenessCheck(config) {
+  if (!config.strictActionTypeUniqueness) {
+    return;
+  }
+
+  const duplicates = Object.entries(REGISTERED_ACTION_TYPES).filter(([, registrations]) => registrations > 1).map(([type]) => type);
+
+  if (duplicates.length) {
+    throw new Error(`Action types are registered more than once, ${duplicates.map(type => `"${type}"`).join(', ')}. ${RUNTIME_CHECK_URL}#strictactiontypeuniqueness`);
+  }
+}
+
+class StoreRootModule {
+  constructor(actions$, reducer$, scannedActions$, store, guard, actionCheck) {}
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreRootModule.ɵfac = function StoreRootModule_Factory(t) {
+  return new (t || StoreRootModule)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ActionsSubject), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ReducerObservable), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ScannedActionsSubject), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](Store), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](_ROOT_STORE_GUARD, 8), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](_ACTION_TYPE_UNIQUENESS_CHECK, 8));
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreRootModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineNgModule"]({
+  type: StoreRootModule
+});
+/** @nocollapse */
+
+/** @nocollapse */
+
+StoreRootModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjector"]({});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](StoreRootModule, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.NgModule,
+    args: [{}]
+  }], function () {
+    return [{
+      type: ActionsSubject
+    }, {
+      type: ReducerObservable
+    }, {
+      type: ScannedActionsSubject
+    }, {
+      type: Store
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Optional
+      }, {
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [_ROOT_STORE_GUARD]
+      }]
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Optional
+      }, {
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [_ACTION_TYPE_UNIQUENESS_CHECK]
+      }]
+    }];
+  }, null);
+})();
+
+class StoreFeatureModule {
+  constructor(features, featureReducers, reducerManager, root, actionCheck) {
+    this.features = features;
+    this.featureReducers = featureReducers;
+    this.reducerManager = reducerManager;
+    const feats = features.map((feature, index) => {
+      const featureReducerCollection = featureReducers.shift(); // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+
+      const reducers = featureReducerCollection
+      /*TODO(#823)*/
+      [index];
+      return Object.assign(Object.assign({}, feature), {
+        reducers,
+        initialState: _initialStateFactory(feature.initialState)
+      });
+    });
+    reducerManager.addFeatures(feats);
+  } // eslint-disable-next-line @angular-eslint/contextual-lifecycle
+
+
+  ngOnDestroy() {
+    this.reducerManager.removeFeatures(this.features);
+  }
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreFeatureModule.ɵfac = function StoreFeatureModule_Factory(t) {
+  return new (t || StoreFeatureModule)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](_STORE_FEATURES), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](FEATURE_REDUCERS), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](ReducerManager), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](StoreRootModule), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinject"](_ACTION_TYPE_UNIQUENESS_CHECK, 8));
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreFeatureModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineNgModule"]({
+  type: StoreFeatureModule
+});
+/** @nocollapse */
+
+/** @nocollapse */
+
+StoreFeatureModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjector"]({});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](StoreFeatureModule, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.NgModule,
+    args: [{}]
+  }], function () {
+    return [{
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [_STORE_FEATURES]
+      }]
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [FEATURE_REDUCERS]
+      }]
+    }, {
+      type: ReducerManager
+    }, {
+      type: StoreRootModule
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Optional
+      }, {
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [_ACTION_TYPE_UNIQUENESS_CHECK]
+      }]
+    }];
+  }, null);
+})();
+
+class StoreModule {
+  static forRoot(reducers, config = {}) {
+    return {
+      ngModule: StoreRootModule,
+      providers: [{
+        provide: _ROOT_STORE_GUARD,
+        useFactory: _provideForRootGuard,
+        deps: [[Store, new _angular_core__WEBPACK_IMPORTED_MODULE_1__.Optional(), new _angular_core__WEBPACK_IMPORTED_MODULE_1__.SkipSelf()]]
+      }, {
+        provide: _INITIAL_STATE,
+        useValue: config.initialState
+      }, {
+        provide: INITIAL_STATE,
+        useFactory: _initialStateFactory,
+        deps: [_INITIAL_STATE]
+      }, {
+        provide: _INITIAL_REDUCERS,
+        useValue: reducers
+      }, {
+        provide: _STORE_REDUCERS,
+        useExisting: reducers instanceof _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken ? reducers : _INITIAL_REDUCERS
+      }, {
+        provide: INITIAL_REDUCERS,
+        deps: [_angular_core__WEBPACK_IMPORTED_MODULE_1__.Injector, _INITIAL_REDUCERS, [new _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject(_STORE_REDUCERS)]],
+        useFactory: _createStoreReducers
+      }, {
+        provide: USER_PROVIDED_META_REDUCERS,
+        useValue: config.metaReducers ? config.metaReducers : []
+      }, {
+        provide: _RESOLVED_META_REDUCERS,
+        deps: [META_REDUCERS, USER_PROVIDED_META_REDUCERS],
+        useFactory: _concatMetaReducers
+      }, {
+        provide: _REDUCER_FACTORY,
+        useValue: config.reducerFactory ? config.reducerFactory : combineReducers
+      }, {
+        provide: REDUCER_FACTORY,
+        deps: [_REDUCER_FACTORY, _RESOLVED_META_REDUCERS],
+        useFactory: createReducerFactory
+      }, ACTIONS_SUBJECT_PROVIDERS, REDUCER_MANAGER_PROVIDERS, SCANNED_ACTIONS_SUBJECT_PROVIDERS, STATE_PROVIDERS, STORE_PROVIDERS, provideRuntimeChecks(config.runtimeChecks), checkForActionTypeUniqueness()]
+    };
+  }
+
+  static forFeature(featureNameOrSlice, reducers, config = {}) {
+    return {
+      ngModule: StoreFeatureModule,
+      providers: [{
+        provide: _FEATURE_CONFIGS,
+        multi: true,
+        useValue: featureNameOrSlice instanceof Object ? {} : config
+      }, {
+        provide: STORE_FEATURES,
+        multi: true,
+        useValue: {
+          key: featureNameOrSlice instanceof Object ? featureNameOrSlice.name : featureNameOrSlice,
+          reducerFactory: !(config instanceof _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken) && config.reducerFactory ? config.reducerFactory : combineReducers,
+          metaReducers: !(config instanceof _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken) && config.metaReducers ? config.metaReducers : [],
+          initialState: !(config instanceof _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken) && config.initialState ? config.initialState : undefined
+        }
+      }, {
+        provide: _STORE_FEATURES,
+        deps: [_angular_core__WEBPACK_IMPORTED_MODULE_1__.Injector, _FEATURE_CONFIGS, STORE_FEATURES],
+        useFactory: _createFeatureStore
+      }, {
+        provide: _FEATURE_REDUCERS,
+        multi: true,
+        useValue: featureNameOrSlice instanceof Object ? featureNameOrSlice.reducer : reducers
+      }, {
+        provide: _FEATURE_REDUCERS_TOKEN,
+        multi: true,
+        useExisting: reducers instanceof _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken ? reducers : _FEATURE_REDUCERS
+      }, {
+        provide: FEATURE_REDUCERS,
+        multi: true,
+        deps: [_angular_core__WEBPACK_IMPORTED_MODULE_1__.Injector, _FEATURE_REDUCERS, [new _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject(_FEATURE_REDUCERS_TOKEN)]],
+        useFactory: _createFeatureReducers
+      }, checkForActionTypeUniqueness()]
+    };
+  }
+
+}
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreModule.ɵfac = function StoreModule_Factory(t) {
+  return new (t || StoreModule)();
+};
+/** @nocollapse */
+
+/** @nocollapse */
+
+
+StoreModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineNgModule"]({
+  type: StoreModule
+});
+/** @nocollapse */
+
+/** @nocollapse */
+
+StoreModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjector"]({});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](StoreModule, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.NgModule,
+    args: [{}]
+  }], null, null);
+})();
+
+function _createStoreReducers(injector, reducers) {
+  return reducers instanceof _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken ? injector.get(reducers) : reducers;
+}
+
+function _createFeatureStore(injector, configs, featureStores) {
+  return featureStores.map((feat, index) => {
+    if (configs[index] instanceof _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken) {
+      const conf = injector.get(configs[index]);
+      return {
+        key: feat.key,
+        reducerFactory: conf.reducerFactory ? conf.reducerFactory : combineReducers,
+        metaReducers: conf.metaReducers ? conf.metaReducers : [],
+        initialState: conf.initialState
+      };
+    }
+
+    return feat;
+  });
+}
+
+function _createFeatureReducers(injector, reducerCollection) {
+  const reducers = reducerCollection.map(reducer => {
+    return reducer instanceof _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken ? injector.get(reducer) : reducer;
+  });
+  return reducers;
+}
+
+function _initialStateFactory(initialState) {
+  if (typeof initialState === 'function') {
+    return initialState();
+  }
+
+  return initialState;
+}
+
+function _concatMetaReducers(metaReducers, userProvidedMetaReducers) {
+  return metaReducers.concat(userProvidedMetaReducers);
+}
+
+function _provideForRootGuard(store) {
+  if (store) {
+    throw new TypeError(`StoreModule.forRoot() called twice. Feature modules should use StoreModule.forFeature() instead.`);
+  }
+
+  return 'guarded';
+}
+/**
+ * @description
+ * Associates actions with a given state change function.
+ * A state change function must be provided as the last parameter.
+ *
+ * @param args `ActionCreator`'s followed by a state change function.
+ *
+ * @returns an association of action types with a state change function.
+ *
+ * @usageNotes
+ * ```ts
+ * on(AuthApiActions.loginSuccess, (state, { user }) => ({ ...state, user }))
+ * ```
+ */
+
+
+function on(...args) {
+  // This could be refactored when TS releases the version with this fix:
+  // https://github.com/microsoft/TypeScript/pull/41544
+  const reducer = args.pop();
+  const types = args.map(creator => creator.type);
+  return {
+    reducer,
+    types
+  };
+}
+/**
+ * @description
+ * Creates a reducer function to handle state transitions.
+ *
+ * Reducer creators reduce the explicitness of reducer functions with switch statements.
+ *
+ * @param initialState Provides a state value if the current state is `undefined`, as it is initially.
+ * @param ons Associations between actions and state changes.
+ * @returns A reducer function.
+ *
+ * @usageNotes
+ *
+ * - Must be used with `ActionCreator`'s (returned by `createAction`). Cannot be used with class-based action creators.
+ * - The returned `ActionReducer` should additionally be wrapped with another function, if you are using View Engine AOT.
+ * In case you are using Ivy (or only JIT View Engine) the extra wrapper function is not required.
+ *
+ * **Declaring a reducer creator**
+ *
+ * ```ts
+ * export const reducer = createReducer(
+ *   initialState,
+ *   on(
+ *     featureActions.actionOne,
+ *     featureActions.actionTwo,
+ *     (state, { updatedValue }) => ({ ...state, prop: updatedValue })
+ *   ),
+ *   on(featureActions.actionThree, () => initialState);
+ * );
+ * ```
+ *
+ * **Declaring a reducer creator using a wrapper function (Only needed if using View Engine AOT)**
+ *
+ * ```ts
+ * const featureReducer = createReducer(
+ *   initialState,
+ *   on(
+ *     featureActions.actionOne,
+ *     featureActions.actionTwo,
+ *     (state, { updatedValue }) => ({ ...state, prop: updatedValue })
+ *   ),
+ *   on(featureActions.actionThree, () => initialState);
+ * );
+ *
+ * export function reducer(state: State | undefined, action: Action) {
+ *   return featureReducer(state, action);
+ * }
+ * ```
+ */
+
+
+function createReducer(initialState, ...ons) {
+  const map = new Map();
+
+  for (const on of ons) {
+    for (const type of on.types) {
+      const existingReducer = map.get(type);
+
+      if (existingReducer) {
+        const newReducer = (state, action) => on.reducer(existingReducer(state, action), action);
+
+        map.set(type, newReducer);
+      } else {
+        map.set(type, on.reducer);
+      }
+    }
+  }
+
+  return function (state = initialState, action) {
+    const reducer = map.get(action.type);
+    return reducer ? reducer(state, action) : state;
+  };
+}
+/**
+ * DO NOT EDIT
+ *
+ * This file is automatically generated at build
+ */
+
+/**
+ * Generated bundle index. Do not edit.
+ */
+
 
 
 

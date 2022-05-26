@@ -24,8 +24,12 @@ const routes = [
     },
     {
         path: '',
-        redirectTo: 'home',
+        redirectTo: 'vinyl',
         pathMatch: 'full'
+    },
+    {
+        path: 'vinyl',
+        loadChildren: () => __webpack_require__.e(/*! import() */ "src_app_vinyl_vinyl_module_ts").then(__webpack_require__.bind(__webpack_require__, /*! ./vinyl/vinyl.module */ 4904)).then(m => m.VinylPageModule)
     },
 ];
 let AppRoutingModule = class AppRoutingModule {
@@ -33,7 +37,7 @@ let AppRoutingModule = class AppRoutingModule {
 AppRoutingModule = (0,tslib__WEBPACK_IMPORTED_MODULE_0__.__decorate)([
     (0,_angular_core__WEBPACK_IMPORTED_MODULE_1__.NgModule)({
         imports: [
-            _angular_router__WEBPACK_IMPORTED_MODULE_2__.RouterModule.forRoot(routes, { preloadingStrategy: _angular_router__WEBPACK_IMPORTED_MODULE_2__.PreloadAllModules })
+            _angular_router__WEBPACK_IMPORTED_MODULE_2__.RouterModule.forRoot(routes, { preloadingStrategy: _angular_router__WEBPACK_IMPORTED_MODULE_2__.PreloadAllModules, useHash: true })
         ],
         exports: [_angular_router__WEBPACK_IMPORTED_MODULE_2__.RouterModule]
     })
@@ -89,13 +93,25 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "AppModule": () => (/* binding */ AppModule)
 /* harmony export */ });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! tslib */ 4929);
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/core */ 3184);
-/* harmony import */ var _angular_platform_browser__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @angular/platform-browser */ 318);
-/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @angular/router */ 2816);
-/* harmony import */ var _ionic_angular__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @ionic/angular */ 3819);
+/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! tslib */ 4929);
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @angular/core */ 3184);
+/* harmony import */ var _angular_platform_browser__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @angular/platform-browser */ 318);
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! @angular/router */ 2816);
+/* harmony import */ var _ionic_angular__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @ionic/angular */ 3819);
 /* harmony import */ var _app_component__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./app.component */ 5041);
 /* harmony import */ var _app_routing_module__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./app-routing.module */ 158);
+/* harmony import */ var _ngrx_store__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @ngrx/store */ 5585);
+/* harmony import */ var _ngrx_reducers__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../ngrx/reducers */ 9980);
+/* harmony import */ var _angular_common_http__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @angular/common/http */ 8784);
+/* harmony import */ var _backend_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./backend.service */ 254);
+/* harmony import */ var _ngrx_store_devtools__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @ngrx/store-devtools */ 5811);
+/* harmony import */ var _environments_environment__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../environments/environment */ 2340);
+
+
+
+
+
+
 
 
 
@@ -105,15 +121,67 @@ __webpack_require__.r(__webpack_exports__);
 
 let AppModule = class AppModule {
 };
-AppModule = (0,tslib__WEBPACK_IMPORTED_MODULE_2__.__decorate)([
-    (0,_angular_core__WEBPACK_IMPORTED_MODULE_3__.NgModule)({
+AppModule = (0,tslib__WEBPACK_IMPORTED_MODULE_5__.__decorate)([
+    (0,_angular_core__WEBPACK_IMPORTED_MODULE_6__.NgModule)({
         declarations: [_app_component__WEBPACK_IMPORTED_MODULE_0__.AppComponent],
         entryComponents: [],
-        imports: [_angular_platform_browser__WEBPACK_IMPORTED_MODULE_4__.BrowserModule, _ionic_angular__WEBPACK_IMPORTED_MODULE_5__.IonicModule.forRoot(), _app_routing_module__WEBPACK_IMPORTED_MODULE_1__.AppRoutingModule],
-        providers: [{ provide: _angular_router__WEBPACK_IMPORTED_MODULE_6__.RouteReuseStrategy, useClass: _ionic_angular__WEBPACK_IMPORTED_MODULE_5__.IonicRouteStrategy }],
+        imports: [
+            _angular_platform_browser__WEBPACK_IMPORTED_MODULE_7__.BrowserModule,
+            _angular_common_http__WEBPACK_IMPORTED_MODULE_8__.HttpClientModule,
+            _ionic_angular__WEBPACK_IMPORTED_MODULE_9__.IonicModule.forRoot(),
+            _app_routing_module__WEBPACK_IMPORTED_MODULE_1__.AppRoutingModule,
+            _ngrx_store__WEBPACK_IMPORTED_MODULE_10__.StoreModule.forRoot(_ngrx_reducers__WEBPACK_IMPORTED_MODULE_2__.StoreReducers),
+            _ngrx_store_devtools__WEBPACK_IMPORTED_MODULE_11__.StoreDevtoolsModule.instrument({ maxAge: 25, logOnly: _environments_environment__WEBPACK_IMPORTED_MODULE_4__.environment.production })
+        ],
+        providers: [
+            { provide: _angular_router__WEBPACK_IMPORTED_MODULE_12__.RouteReuseStrategy, useClass: _ionic_angular__WEBPACK_IMPORTED_MODULE_9__.IonicRouteStrategy },
+            _backend_service__WEBPACK_IMPORTED_MODULE_3__.BackendService
+        ],
         bootstrap: [_app_component__WEBPACK_IMPORTED_MODULE_0__.AppComponent],
     })
 ], AppModule);
+
+
+
+/***/ }),
+
+/***/ 254:
+/*!************************************!*\
+  !*** ./src/app/backend.service.ts ***!
+  \************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "BackendService": () => (/* binding */ BackendService)
+/* harmony export */ });
+/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! tslib */ 4929);
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/core */ 3184);
+/* harmony import */ var _angular_common_http__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/common/http */ 8784);
+
+
+
+let BackendService = class BackendService {
+    constructor(http) {
+        this.http = http;
+    }
+    getVinyls() {
+        const headers = new _angular_common_http__WEBPACK_IMPORTED_MODULE_0__.HttpHeaders()
+            .append("Authorization", "Bearer 34959f1e7df53e3169c0ddb2f1c9246463301d5eef84daca4d4462ee831c7a396b4f5c72da8192762d26f88f16150f2f616d64650db891dc88d9ec10b4a0deb67f84b3a118d2ee4d72cbba1a2871ed16e49cb591fd48035e7dc2640fdf6106c348e6c8690b3ecad82afbb4f07df1b5b983092c4f868d9c30a9299e1d7fb8eb34");
+        console.log("Fetch Vinyl Records");
+        return this.http
+            .get("https://api.mainwaring.dev/api/vinyls/", { headers });
+    }
+};
+BackendService.ctorParameters = () => [
+    { type: _angular_common_http__WEBPACK_IMPORTED_MODULE_0__.HttpClient }
+];
+BackendService = (0,tslib__WEBPACK_IMPORTED_MODULE_1__.__decorate)([
+    (0,_angular_core__WEBPACK_IMPORTED_MODULE_2__.Injectable)({
+        providedIn: 'root'
+    })
+], BackendService);
 
 
 
@@ -169,6 +237,118 @@ if (_environments_environment__WEBPACK_IMPORTED_MODULE_1__.environment.productio
 }
 (0,_angular_platform_browser_dynamic__WEBPACK_IMPORTED_MODULE_3__.platformBrowserDynamic)().bootstrapModule(_app_app_module__WEBPACK_IMPORTED_MODULE_0__.AppModule)
     .catch(err => console.log(err));
+
+
+/***/ }),
+
+/***/ 9980:
+/*!******************************!*\
+  !*** ./src/ngrx/reducers.ts ***!
+  \******************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "StoreReducers": () => (/* binding */ StoreReducers)
+/* harmony export */ });
+/* harmony import */ var _vinyl_vinyl_reducer__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./vinyl/vinyl.reducer */ 6333);
+
+const StoreReducers = {
+    Vinyl: _vinyl_vinyl_reducer__WEBPACK_IMPORTED_MODULE_0__.vinylReducer
+};
+
+
+/***/ }),
+
+/***/ 4478:
+/*!*****************************************!*\
+  !*** ./src/ngrx/vinyl/vinyl.actions.ts ***!
+  \*****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "VINYL_ACTIONS": () => (/* binding */ VINYL_ACTIONS),
+/* harmony export */   "GetVinylRecordsResponse": () => (/* binding */ GetVinylRecordsResponse)
+/* harmony export */ });
+const VINYL_ACTIONS = {
+    GetVinylRecordsResponse: "Vinyl:GetRecordsResponse"
+};
+class GetVinylRecordsResponse {
+    constructor(payload = null) {
+        this.payload = payload;
+        this.type = VINYL_ACTIONS.GetVinylRecordsResponse;
+    }
+}
+
+
+/***/ }),
+
+/***/ 3616:
+/*!***************************************!*\
+  !*** ./src/ngrx/vinyl/vinyl.model.ts ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "DEFAULT_VINYL_STATE": () => (/* binding */ DEFAULT_VINYL_STATE)
+/* harmony export */ });
+const DEFAULT_VINYL_STATE = {
+    records: [
+    // {
+    //     artist: "Porter Robinson",
+    //     releaseId: "5987590",
+    //     thumbnail: "https://i.discogs.com/maCI46zYJfIDWb2sysIL2CY6Kie203Zp1_B66hb-8Qk/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTU5ODc1/OTAtMTQwODE2MjU2/My01NTEwLmpwZWc.jpeg",
+    //     title: "Worlds",
+    //     vinylId: 9,
+    //     year: 2014
+    // },
+    // {
+    //     artist: "Foo Fighters",
+    //     releaseId: "6309238",
+    //     thumbnail: "https://i.discogs.com/_733jlNzkJBtNdzTqVuWr0d4gnrY7F1WwsqDCDlZ32A/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTYzMDky/MzgtMTQxNjE0NDgx/OS05ODUzLmpwZWc.jpeg",
+    //     title: "Sonic Highways",
+    //     vinylId: 52,
+    //     year: 2014
+    // },
+    ]
+};
+
+
+/***/ }),
+
+/***/ 6333:
+/*!*****************************************!*\
+  !*** ./src/ngrx/vinyl/vinyl.reducer.ts ***!
+  \*****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "vinylReducer": () => (/* binding */ vinylReducer)
+/* harmony export */ });
+/* harmony import */ var _vinyl_model__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./vinyl.model */ 3616);
+/* harmony import */ var _vinyl_actions__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./vinyl.actions */ 4478);
+
+
+function vinylReducer(state = _vinyl_model__WEBPACK_IMPORTED_MODULE_0__.DEFAULT_VINYL_STATE, action) {
+    switch (action.type) {
+        case _vinyl_actions__WEBPACK_IMPORTED_MODULE_1__.VINYL_ACTIONS.GetVinylRecordsResponse:
+            return getVinylRecordsResponse(state, action);
+        default:
+            return state;
+    }
+}
+function getVinylRecordsResponse(state, action) {
+    const newState = Object.assign({}, state);
+    newState.records = action.payload;
+    return newState;
+}
 
 
 /***/ }),
