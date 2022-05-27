@@ -5,7 +5,7 @@
 </ion-header>
 
 <ion-content *ngIf="viewModel$ | async as vm">
-  <ion-list>
+  <ion-list *ngIf="vm.records.length > 0">
     <ion-item *ngFor="let record of vm.records">
       <ion-thumbnail slot="start">
         <img [src]="record.thumbnail" />

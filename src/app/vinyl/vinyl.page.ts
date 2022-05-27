@@ -5,6 +5,7 @@ import {Observable} from "rxjs";
 import {VinylRecord, VinylState} from "../../ngrx/vinyl/vinyl.model";
 import {BackendService} from "../backend.service";
 import {GetVinylRecordsResponse} from "../../ngrx/vinyl/vinyl.actions";
+import {DismissLoader, ShowLoader} from "../../ngrx/application/application.actions";
 
 @Component({
   selector: 'app-vinyl',
@@ -19,6 +20,7 @@ export class VinylPage implements OnInit {
   }
 
   ngOnInit() {
+    this.store.dispatch(new ShowLoader());
     this.backend.getVinyls().subscribe((res: any) => {
       const records = res.data.map((record) => {
         const vinylRecord: VinylRecord = {
@@ -31,7 +33,8 @@ export class VinylPage implements OnInit {
         };
         return vinylRecord;
       });
-      return this.store.dispatch(new GetVinylRecordsResponse(records));
+      this.store.dispatch(new GetVinylRecordsResponse(records));
+      return this.store.dispatch(new DismissLoader());
     });
   }
 
