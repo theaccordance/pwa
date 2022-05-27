@@ -3,7 +3,7 @@ import {Store} from "@ngrx/store";
 import {RootState} from "../../ngrx/state";
 import {Observable} from "rxjs";
 import {VinylRecord, VinylState} from "../../ngrx/vinyl/vinyl.model";
-import {BackendService} from "../backend.service";
+import {BackendService} from "../../backend.service";
 import {GetVinylRecordsResponse} from "../../ngrx/vinyl/vinyl.actions";
 import {DismissLoader, ShowLoader} from "../../ngrx/application/application.actions";
 

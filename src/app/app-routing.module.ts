@@ -4,12 +4,24 @@ import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
 const routes: Routes = [
   {
     path: '',
-    redirectTo: 'vinyl',
+    redirectTo: 'desktop',
     pathMatch: 'full'
   },
   {
     path: 'vinyl',
-    loadChildren: () => import('./vinyl/vinyl.module').then( m => m.VinylPageModule)
+    loadChildren: () => import('./pages/vinyl/vinyl.module').then( m => m.VinylPageModule)
+  },
+  {
+    path: 'desktop',
+    loadChildren: () => import('./layouts/desktop/desktop.module').then( m => m.DesktopPageModule)
+  },
+  {
+    path: 'about',
+    loadChildren: () => import('./pages/about/about.module').then( m => m.AboutPageModule)
+  },
+  {
+    path: 'settings',
+    loadChildren: () => import('./pages/settings/settings.module').then( m => m.SettingsPageModule)
   },
 ];
 

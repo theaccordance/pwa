@@ -1,0 +1,24 @@
+<ion-split-pane when="xs" content-id="main">
+  <ion-menu content-id="main">
+    <ion-header>
+      <ion-toolbar color="primary">
+        <ion-title>Navigation</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <ion-list *ngIf="features$ | async as featureFlags">
+        <ion-menu-toggle auto-hide="false">
+          <ion-item button *ngFor="let feature of featureFlags" routerLink="{{feature.url}}">
+            <ion-icon slot="start" [name]='feature.icon'></ion-icon>
+            <ion-label>
+              {{feature.label}}
+            </ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+      </ion-list>
+    </ion-content>
+  </ion-menu>
+
+  <ion-router-outlet id="main" ></ion-router-outlet>
+
+</ion-split-pane>

@@ -7,7 +7,7 @@ import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 import { AppComponent } from './app.component';
 import { AppRoutingModule } from './app-routing.module';
 import {StoreModule} from "@ngrx/store";
-import {StoreReducers} from "../ngrx/reducers";
+import {StoreReducers} from "./ngrx/reducers";
 import {HttpClientModule} from "@angular/common/http";
 import {BackendService} from "./backend.service";
 import {StoreDevtoolsModule} from "@ngrx/store-devtools";

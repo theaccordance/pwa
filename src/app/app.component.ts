@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import {LoadingController} from "@ionic/angular";
 import {Observable} from "rxjs";
 import {Store} from "@ngrx/store";
-import {RootState} from "../ngrx/state";
+import {RootState} from "./ngrx/state";
 
 @Component({
   selector: 'app-root',
