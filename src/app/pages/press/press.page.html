@@ -1,0 +1,16 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Press Articles</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content *ngIf="viewModel$ | async as vm">
+  <ion-list *ngIf="vm.articles.length > 0">
+    <ion-item *ngFor="let article of vm.articles" (click)="openLink(article.url)">
+      <ion-label>
+        <h3>{{article.title}}</h3>
+        <p>{{article.publisher}}</p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+</ion-content>

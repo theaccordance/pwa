@@ -31,8 +31,8 @@ const features: FeatureFlag[] = [
         url: "/desktop/about"
     },
     {
-        icon: "information-circle-outline",
-        label: "Press",
+        icon: "newspaper-outline",
+        label: "Press Articles",
         type: "feature:press",
         url: "/desktop/press"
     },
