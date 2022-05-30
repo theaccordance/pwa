@@ -30,6 +30,12 @@ const features: FeatureFlag[] = [
         type: "feature:about",
         url: "/desktop/about"
     },
+    {
+        icon: "information-circle-outline",
+        label: "Press",
+        type: "feature:press",
+        url: "/desktop/press"
+    },
 ];
 
 export const DEFAULT_APPLICATION_STATE = {

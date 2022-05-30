@@ -13,6 +13,10 @@ const routes: Routes = [
         loadChildren: () => import('../../pages/about/about.module').then( m => m.AboutPageModule)
       },
       {
+        path: 'press',
+        loadChildren: () => import('../../pages/press/press.module').then( m => m.PressPageModule)
+      },
+      {
         path: 'settings',
         loadChildren: () => import('../../pages/settings/settings.module').then( m => m.SettingsPageModule)
       },
