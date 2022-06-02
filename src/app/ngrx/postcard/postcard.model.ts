@@ -4,7 +4,7 @@ export interface Postcard {
     destination: string;
     location: string;
     date: string;
-    story: string;
+    // story?: string;
     image: string;
 }
 

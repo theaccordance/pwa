@@ -4,8 +4,8 @@ import {Store} from "@ngrx/store";
 import {RootState} from "../../ngrx/state";
 import {BackendService} from "../../backend.service";
 import {Observable} from "rxjs";
-import {PostcardState} from "../../ngrx/postcard/postcard.model";
-import {TogglePostcardLayout} from "../../ngrx/postcard/postcard.actions";
+import {Postcard, PostcardState} from "../../ngrx/postcard/postcard.model";
+import {GetPostcardsResponse, TogglePostcardLayout} from "../../ngrx/postcard/postcard.actions";
 import {DismissLoader, ShowLoader} from "../../ngrx/application/application.actions";
 
 
@@ -29,11 +29,21 @@ export class PostcardPage implements OnInit {
     this.displayList$ = this.store.select((state: RootState) => state.Postcard.displayList);
   }
 
-  ngOnInit() {
-    this.store.dispatch(new ShowLoader());
+  async ngOnInit() {
+    // this.store.dispatch(new ShowLoader());
     this.backend.getPostcards().subscribe((res: any) => {
-      console.log(res);
-      return this.store.dispatch(new DismissLoader());
+      const postcards = res.data.map((item) => {
+        const postcard: Postcard = {
+          id: item.id,
+          destination: item.attributes.destination,
+          location: item.attributes.location,
+          date: item.attributes.date,
+          image: item.attributes.cover_image.data.attributes.formats.large.url
+        };
+        return postcard;
+      });
+      this.store.dispatch(new GetPostcardsResponse(postcards));
+      // return this.store.dispatch(new DismissLoader());
     });
   }
 
