@@ -27,6 +27,10 @@ const routes: Routes = [
     path: 'press',
     loadChildren: () => import('./pages/press/press.module').then( m => m.PressPageModule)
   },
+  {
+    path: 'postcard',
+    loadChildren: () => import('./pages/postcard/postcard.module').then( m => m.PostcardPageModule)
+  },
 ];
 
 @NgModule({

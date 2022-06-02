@@ -1,0 +1,30 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Postcards</ion-title>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-segment (ionChange)="toggleLayout()" [value]="displayList$ | async">
+      <ion-segment-button value="true">
+        <ion-label>List</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="false">
+        <ion-label>Map</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content *ngIf="viewModel$ | async as vm">
+  <capacitor-google-map #map [hidden]="vm.displayList"></capacitor-google-map>
+  <ion-list [hidden]="!vm.displayList">
+    <ion-item *ngFor="let postcard of vm.postcards">
+      <ion-thumbnail>
+        <img [src]="postcard.image" />
+      </ion-thumbnail>
+      <ion-label>
+        <h3>{{postcard.destination}}</h3>
+        <p>{{postcard.location}}</p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+</ion-content>

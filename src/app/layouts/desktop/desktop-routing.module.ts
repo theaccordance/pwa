@@ -17,6 +17,10 @@ const routes: Routes = [
         loadChildren: () => import('../../pages/press/press.module').then( m => m.PressPageModule)
       },
       {
+        path: 'postcard',
+        loadChildren: () => import('../../pages/postcard/postcard.module').then( m => m.PostcardPageModule)
+      },
+      {
         path: 'settings',
         loadChildren: () => import('../../pages/settings/settings.module').then( m => m.SettingsPageModule)
       },

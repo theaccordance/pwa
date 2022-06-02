@@ -19,6 +19,18 @@ const features: FeatureFlag[] = [
         url: "/desktop/vinyl"
     },
     {
+        icon: "newspaper-outline",
+        label: "Press Articles",
+        type: "feature:press",
+        url: "/desktop/press"
+    },
+    {
+        icon: "airplane-outline",
+        label: "Postcards",
+        type: "feature:postcard",
+        url: "/desktop/postcard"
+    },
+    {
         icon: "settings-outline",
         label: "Settings",
         type: "feature:settings",
@@ -29,13 +41,7 @@ const features: FeatureFlag[] = [
         label: "About",
         type: "feature:about",
         url: "/desktop/about"
-    },
-    {
-        icon: "newspaper-outline",
-        label: "Press Articles",
-        type: "feature:press",
-        url: "/desktop/press"
-    },
+    }
 ];
 
 export const DEFAULT_APPLICATION_STATE = {
